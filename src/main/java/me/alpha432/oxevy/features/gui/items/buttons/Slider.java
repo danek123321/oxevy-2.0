@@ -1,0 +1,91 @@
+package me.alpha432.oxevy.features.gui.items.buttons;
+
+import me.alpha432.oxevy.Oxevy;
+import me.alpha432.oxevy.features.gui.OxevyGui;
+import me.alpha432.oxevy.features.gui.Widget;
+import me.alpha432.oxevy.features.modules.client.ClickGuiModule;
+import me.alpha432.oxevy.util.ColorUtil;
+import me.alpha432.oxevy.features.settings.Setting;
+import me.alpha432.oxevy.util.render.RenderUtil;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import org.lwjgl.glfw.GLFW;
+
+public class Slider
+        extends Button {
+    private final Number min;
+    private final Number max;
+    private final int difference;
+    public Setting<Number> setting;
+
+    public Slider(Setting<Number> setting) {
+        super(setting.getName());
+        this.setting = setting;
+        this.min = setting.getMin();
+        this.max = setting.getMax();
+        this.difference = this.max.intValue() - this.min.intValue();
+        this.width = 15;
+    }
+
+    @Override
+    public void drawScreen(GuiGraphics context, int mouseX, int mouseY, float partialTicks) {
+        this.dragSetting(mouseX, mouseY);
+        RenderUtil.rect(context, this.x, this.y, this.x + (float) this.width + 7.4f, this.y + (float) this.height - 0.5f, !this.isHovering(mouseX, mouseY) ? 0x11555555 : -2007673515);
+        RenderUtil.rect(context, this.x, this.y, (this.setting.getValue()).floatValue() <= this.min.floatValue() ? this.x : this.x + ((float) this.width + 7.4f) * this.partialMultiplier(), this.y + (float) this.height - 0.5f, !this.isHovering(mouseX, mouseY) ? Oxevy.colorManager.getColorWithAlpha(y, ClickGuiModule.getInstance().color.getValue().getAlpha()) : Oxevy.colorManager.getColorWithAlpha(y, ClickGuiModule.getInstance().topColor.getValue().getAlpha()));
+        int textColor = ColorUtil.toRGBA(ClickGuiModule.getInstance().color.getValue());
+        drawString(this.getName() + " " + ChatFormatting.GRAY + (this.setting.getValue() instanceof Float ? this.setting.getValue() : Double.valueOf((this.setting.getValue()).doubleValue())), this.x + 2.3f, this.y - 1.7f - (float) OxevyGui.getClickGui().getTextOffset(), textColor);
+    }
+
+    @Override
+    public void mouseClicked(int mouseX, int mouseY, int mouseButton) {
+        super.mouseClicked(mouseX, mouseY, mouseButton);
+        if (this.isHovering(mouseX, mouseY)) {
+            this.setSettingFromX(mouseX);
+        }
+    }
+
+    @Override
+    public boolean isHovering(int mouseX, int mouseY) {
+        for (Widget widget : OxevyGui.getClickGui().getComponents()) {
+            if (!widget.drag) continue;
+            return false;
+        }
+        return (float) mouseX >= this.getX() && (float) mouseX <= this.getX() + (float) this.getWidth() + 8.0f && (float) mouseY >= this.getY() && (float) mouseY < this.getY() + (float) this.height;
+    }
+
+    @Override
+    public void update() {
+        this.setHidden(!this.setting.isVisible());
+    }
+
+    private void dragSetting(int mouseX, int mouseY) {
+        if (this.isHovering(mouseX, mouseY) && GLFW.glfwGetMouseButton(mc.getWindow().handle(), 0) == 1) {
+            this.setSettingFromX(mouseX);
+        }
+    }
+
+    private void setSettingFromX(int mouseX) {
+        float percent = ((float) mouseX - this.x) / ((float) this.width + 7.4f);
+        if (this.setting.getValue() instanceof Double) {
+            double result = (Double) this.setting.getMin() + (double) ((float) this.difference * percent);
+            this.setting.setValue((double) Math.round(10.0 * result) / 10.0);
+        } else if (this.setting.getValue() instanceof Float) {
+            float result = this.setting.getMin().floatValue() + (float) this.difference * percent;
+            this.setting.setValue((float) Math.round(10.0f * result) / 10.0f);
+        } else if (this.setting.getValue() instanceof Integer) {
+            this.setting.setValue((Integer) this.setting.getMin() + (int) ((float) this.difference * percent));
+        }
+    }
+
+    private float middle() {
+        return this.max.floatValue() - this.min.floatValue();
+    }
+
+    private float part() {
+        return (this.setting.getValue()).floatValue() - this.min.floatValue();
+    }
+
+    private float partialMultiplier() {
+        return this.part() / this.middle();
+    }
+}

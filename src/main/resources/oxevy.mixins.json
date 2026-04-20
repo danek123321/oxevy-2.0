@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "me.alpha432.oxevy.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "network.MixinClientConnection"
+  ],
+  "client": [
+    "entity.MixinClientPlayerEntity",
+    "input.MixinKeyboard",
+    "input.MixinMouse",
+    "network.MixinClientPlayNetworkHandler",
+    "render.MixinLevelRenderer",
+    "render.MixinRenderTickCounter",
+    "render.MixinWorldRenderer",
+    "render.gui.MixinCommandSuggestions",
+    "render.gui.MixinInGameHud"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

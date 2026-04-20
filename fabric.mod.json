@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "oxevy_safe_mod",
+  "version": "0.1.0",
+  "name": "OxEvY Safe Mod",
+  "description": "A safe port skeleton for Minecraft 1.21.11 using Fabric",
+  "authors": ["OpenCode"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.oxevy.safemod.Main"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "fabric-api": "*"
+  }
+}
