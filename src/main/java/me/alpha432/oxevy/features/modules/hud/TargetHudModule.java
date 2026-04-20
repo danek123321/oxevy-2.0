@@ -1,18 +1,16 @@
 package me.alpha432.oxevy.features.modules.hud;
 
-import me.alpha432.oxevy.Oxevy;
 import me.alpha432.oxevy.event.impl.render.Render2DEvent;
-import me.alpha432.oxevy.features.modules.client.HudModule;
 import me.alpha432.oxevy.features.settings.Setting;
 import me.alpha432.oxevy.util.render.AnimationUtil;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import java.awt.*;
-import java.text.DecimalFormat;
 
 public class TargetHudModule extends HudModule {
 
@@ -20,35 +18,28 @@ public class TargetHudModule extends HudModule {
     private final Setting<Boolean> showDistance = bool("Distance", true);
     private final Setting<Boolean> showArmor = bool("Armor", true);
     private final Setting<Boolean> showPing = bool("Ping", true);
-    private final Setting<Boolean> showName = bool("Name", true);
-    private final Setting<Boolean> showHealthBar = bool("HealthBar", true);
-    private final Setting<Boolean> showArmorBar = bool("ArmorBar", true);
+    private final Setting<Boolean> showItems = bool("Items", true);
     private final Setting<Boolean> smoothAnimations = bool("SmoothAnimations", true);
-    private final Setting<Color> healthColor = color("HealthColor", 255, 0, 0, 255);
-    private final Setting<Color> armorColor = color("ArmorColor", 0, 120, 255, 255);
 
     private Entity target = null;
     private float targetAlpha = 0.0f;
-    private float lastHealth = 0.0f;
-
-    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.#");
+    private float displayHealth;
+    private float displayArmor;
 
     public TargetHudModule() {
-        super("TargetHUD", "Shows information about your target", 150, 50);
+        super("TargetHUD", "Shows target info", 180, 60);
     }
 
     @Override
-    protected void render(Render2DEvent e) {
-        super.render(e);
-
+    public void drawContent(Render2DEvent e) {
+        if (nullCheck()) return;
+        
         GuiGraphics ctx = e.getContext();
         float x = getX();
         float y = getY();
 
-        // Find target (looking at entity or KillAura target)
         Entity newTarget = findTarget();
         
-        // Update target with animation
         if (newTarget != target) {
             target = newTarget;
             if (smoothAnimations.getValue()) {
@@ -56,7 +47,6 @@ public class TargetHudModule extends HudModule {
             }
         }
 
-        // Update animation
         float targetAlphaTarget = target != null ? 1.0f : 0.0f;
         targetAlpha = AnimationUtil.animate(targetAlpha, targetAlphaTarget, 
             smoothAnimations.getValue() ? 0.15f : 1.0f, AnimationUtil.Easing.EASE_OUT);
@@ -67,108 +57,102 @@ public class TargetHudModule extends HudModule {
             return;
         }
 
-        // Calculate dimensions
-        int maxWidth = 150;
-        int height = 45;
-        int barWidth = maxWidth - 10;
-
-        // Apply fade animation
         int alpha = (int) (targetAlpha * 255);
+        float speed = smoothAnimations.getValue() ? 0.2f : 1.0f;
 
-        // Draw background
-        int bgColor = (alpha << 24) | 0x222222;
-        ctx.fill((int) x, (int) y, (int) x + maxWidth, (int) y + height, bgColor);
-
-        // Draw target name
-        if (showName.getValue()) {
-            String name = target.getName().getString();
-            ctx.drawString(mc.font, name, (int) x + 5, (int) y + 3, 
-                (alpha << 24) | 0xFFFFFF);
+        if (target instanceof LivingEntity living) {
+            displayHealth = AnimationUtil.animate(displayHealth, living.getHealth(), speed, AnimationUtil.Easing.EASE_OUT);
+        }
+        if (target instanceof Player player) {
+            displayArmor = AnimationUtil.animate(displayArmor, player.getArmorValue(), speed, AnimationUtil.Easing.EASE_OUT);
         }
 
-        // Draw health bar
-        if (showHealthBar.getValue() && target instanceof LivingEntity living) {
-            float health = living.getHealth();
-            float maxHealth = living.getMaxHealth();
-            float healthPercent = Math.max(0, Math.min(1, health / maxHealth));
-            
-            // Health bar background
-            ctx.fill((int) x + 5, (int) y + 15, (int) x + 5 + barWidth, (int) y + 23, 
-                (alpha << 24) | 0x444444);
-            
-            // Health bar fill
-            int hpColor = healthColor.getValue().getRGB();
-            int hpAlpha = (alpha << 24) | (hpColor & 0x00FFFFFF);
-            int hpBarWidth = (int) (barWidth * healthPercent);
-            ctx.fill((int) x + 5, (int) y + 15, 
-                (int) x + 5 + hpBarWidth, (int) y + 23, hpAlpha);
-        }
+        int textColor = (alpha << 24) | 0xFFFFFF;
+        int grayColor = (alpha << 24) | 0xAAAAAA;
 
-        // Draw armor bar
-        if (showArmorBar.getValue() && target instanceof Player player) {
-            float armor = player.getArmorValue();
-            float armorPercent = Math.min(1, armor / 20f);
-            
-            // Armor bar background
-            ctx.fill((int) x + 5, (int) y + 25, (int) x + 5 + barWidth, (int) y + 31, 
-                (alpha << 24) | 0x444444);
-            
-            // Armor bar fill
-            int armorColorValue = armorColor.getValue().getRGB();
-            int armorAlpha = (alpha << 24) | (armorColorValue & 0x00FFFFFF);
-            int armorBarWidth = (int) (barWidth * armorPercent);
-            ctx.fill((int) x + 5, (int) y + 25, 
-                (int) x + 5 + armorBarWidth, (int) y + 31, armorAlpha);
-        }
+        String name = target.getName().getString();
+        ctx.drawString(mc.font, name, (int) x + 4, (int) y + 2, textColor);
 
-        // Draw info text
-        int infoY = (int) y + 35;
-        String infoText = "";
-
+        int lineY = (int) y + 14;
         if (showHealth.getValue() && target instanceof LivingEntity living) {
-            infoText += "HP: " + DECIMAL_FORMAT.format(living.getHealth()) + "  ";
+            float hp = displayHealth;
+            float maxHp = living.getMaxHealth();
+            ctx.drawString(mc.font, String.format("%.1f", hp), (int) x + 4, lineY, 0xFF44FF44);
+            ctx.drawString(mc.font, "/" + String.format("%.1f", maxHp), (int) x + 4 + mc.font.width(String.format("%.1f", hp)), lineY, grayColor);
         }
 
+        lineY += 10;
+        if (showArmor.getValue() && target instanceof Player player) {
+            int armorPts = (int) displayArmor;
+            ctx.drawString(mc.font, "Armor: " + armorPts, (int) x + 4, lineY, 0xFF6699FF);
+            
+            float toughness = (float) player.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR_TOUGHNESS);
+            if (toughness > 0) {
+                ctx.drawString(mc.font, " (" + (int)toughness + ")", (int) x + 4 + mc.font.width("Armor: " + armorPts), lineY, 0xFFAAAAAA);
+            }
+        }
+
+        lineY += 10;
         if (showDistance.getValue()) {
             double dist = mc.player.distanceTo(target);
-            infoText += "Dist: " + DECIMAL_FORMAT.format(dist) + "m  ";
-        }
-
-        if (showArmor.getValue() && target instanceof Player player) {
-            infoText += "Armor: " + (int) player.getArmorValue() + "  ";
+            ctx.drawString(mc.font, String.format("%.1fm", dist), (int) x + 4, lineY, grayColor);
         }
 
         if (showPing.getValue() && target instanceof Player player) {
-            // Get ping (approximation)
             int ping = 0;
             try {
-                ping = mc.getConnection().getPlayerInfo(player.getUUID()) != null ? 
-                    mc.getConnection().getPlayerInfo(player.getUUID()).getLatency() : 0;
+                if (mc.getConnection() != null && mc.getConnection().getPlayerInfo(player.getUUID()) != null) {
+                    ping = mc.getConnection().getPlayerInfo(player.getUUID()).getLatency();
+                }
             } catch (Exception ignored) {}
-            infoText += "Ping: " + ping + "ms";
+            ctx.drawString(mc.font, ping + "ms", (int) x + 60, lineY, pingColor(ping, alpha));
         }
 
-        ctx.drawString(mc.font, infoText, (int) x + 5, infoY, (alpha << 24) | 0xAAAAAA);
+        if (showItems.getValue() && target instanceof Player player) {
+            int itemsY = (int) y + 4;
+            int armorStartX = (int) x + 4;
+            renderItem(ctx, player.getItemBySlot(EquipmentSlot.HEAD), armorStartX, itemsY);
+            renderItem(ctx, player.getItemBySlot(EquipmentSlot.CHEST), armorStartX + 18, itemsY);
+            renderItem(ctx, player.getItemBySlot(EquipmentSlot.LEGS), armorStartX + 36, itemsY);
+            renderItem(ctx, player.getItemBySlot(EquipmentSlot.FEET), armorStartX + 54, itemsY);
+            int handsY = itemsY + 18;
+            renderItem(ctx, player.getMainHandItem(), (int) x + 4, handsY);
+            renderItem(ctx, player.getOffhandItem(), (int) x + 22, handsY);
+        }
 
-        setWidth((int) maxWidth);
-        setHeight((int) height);
+        setWidth(150);
+        setHeight(76);
+    }
+
+    private void renderItem(GuiGraphics ctx, ItemStack stack, int x, int y) {
+        if (!stack.isEmpty()) {
+            ctx.renderItem(stack, x, y);
+            ctx.renderItemDecorations(mc.font, stack, x, y);
+        }
+    }
+
+    private int pingColor(int ping, int alpha) {
+        if (ping < 50) return (alpha << 24) | 0x64FF64;
+        if (ping < 100) return (alpha << 24) | 0xC8FF64;
+        if (ping < 150) return (alpha << 24) | 0xFFFF64;
+        return (alpha << 24) | 0xFF6464;
     }
 
     private Entity findTarget() {
-        // Check KillAura target first
-        // You can integrate this with your KillAura module if it has a target field
-        
-        // Look at entity
         Entity entity = mc.crosshairPickEntity;
-        if (entity != null && entity.isAlive()) {
-            return entity;
+        if (entity != null && entity.isAlive() && entity != mc.player) return entity;
+        if (target != null && target.isAlive()) return target;
+        
+        double closestDist = 8.0;
+        Entity closest = null;
+        for (Entity e : mc.level.entitiesForRendering()) {
+            if (e == mc.player || !e.isAlive()) continue;
+            double dist = mc.player.distanceTo(e);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = e;
+            }
         }
-
-        // Return last valid target
-        if (target != null && target.isAlive()) {
-            return target;
-        }
-
-        return null;
+        return closest;
     }
 }
