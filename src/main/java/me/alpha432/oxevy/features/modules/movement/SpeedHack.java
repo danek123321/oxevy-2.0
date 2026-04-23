@@ -6,10 +6,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
-import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 
-public class SpeedBuff extends Module {
+public class SpeedHack extends Module {
 
     private final Setting<Mode> mode = mode("Mode", Mode.VANILLA);
     private final Setting<Float> speed = num("Speed", 1.0f, 0.1f, 5.0f);
@@ -20,7 +18,7 @@ public class SpeedBuff extends Module {
 
     private int tickCounter = 0;
 
-    public SpeedBuff() {
+    public SpeedHack() {
         super("SpeedBuff", "Gives you a speed boost", Category.MOVEMENT);
     }
 

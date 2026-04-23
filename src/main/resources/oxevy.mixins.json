@@ -10,12 +10,14 @@
     "entity.MixinClientPlayerEntity",
     "input.MixinKeyboard",
     "input.MixinMouse",
+    "network.MixinAccountProfileKeyPairManager",
     "network.MixinClientPlayNetworkHandler",
     "render.MixinLevelRenderer",
     "render.MixinRenderTickCounter",
     "render.MixinWorldRenderer",
     "render.gui.MixinCommandSuggestions",
-    "render.gui.MixinInGameHud"
+    "render.gui.MixinInGameHud",
+    "render.gui.MixinTitleScreen"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -1,11 +1,11 @@
-package me.alpha432.oxevy.features.modules.client;
+package me.alpha432.oxevy.features.modules.hud;
 
-import me.alpha432.oxevy.Oxevy;
 import me.alpha432.oxevy.event.impl.input.MouseInputEvent;
 import me.alpha432.oxevy.event.impl.render.Render2DEvent;
 import me.alpha432.oxevy.event.system.Subscribe;
 import me.alpha432.oxevy.features.gui.HudEditorScreen;
 import me.alpha432.oxevy.features.modules.Module;
+import me.alpha432.oxevy.features.modules.client.ClickGuiModule;
 import me.alpha432.oxevy.features.settings.Setting;
 import me.alpha432.oxevy.util.render.RenderUtil;
 import net.minecraft.client.gui.GuiGraphics;
@@ -16,34 +16,37 @@ import java.awt.*;
 
 public abstract class HudModule extends Module {
     public final Setting<Vector2f> pos = vec2f("Position", 0.1f, 0.1f);
-    public final Setting<Boolean> background = bool("Background", true);
-    public final Setting<Color> bgColor = color("BGColor", 0, 0, 0, 100);
+    public final Setting<Boolean> background = bool("Background", false);
+    public final Setting<Boolean> blur = bool("Blur", false);
+    public final Setting<Boolean> rounded = bool("Rounded", true);
+    public final Setting<Float> radius = num("Radius", 4.0f, 0.0f, 10.0f);
+    public final Setting<Color> bgColor = color("BGColor", 0, 0, 0, 160);
+    public final Setting<Boolean> outline = bool("Outline", true);
+    public final Setting<Color> outlineColor = color("OutlineColor", 255, 255, 255, 100);
 
     // Pose settings
     public final Setting<Boolean> modifyPose = bool("Modify Pose", false);
     public final Setting<Float> scale = num("Scale", 1.0f, 0.1f, 5.0f);
     public final Setting<Float> rotation = num("Rotation", 0.0f, -360.0f, 360.0f);
-    public final Setting<Float> skewX = num("SkewX", 0.0f, -2.0f, 2.0f);
-    public final Setting<Float> skewY = num("SkewY", 0.0f, -2.0f, 2.0f);
     public final Setting<Runnable> resetPose = button("Reset Pose", () -> {
         scale.setValue(1.0f);
         rotation.setValue(0.0f);
-        skewX.setValue(0.0f);
-        skewY.setValue(0.0f);
     });
 
     private float dragX, dragY, width, height;
     private boolean dragging, button;
+    
+    // Animation for hover and general state
+    protected float hoverAnim = 0.0f;
 
     public HudModule(String name, String description, float width, float height) {
         super(name, description, Category.HUD);
         this.width = width;
         this.height = height;
 
+        radius.setVisibility(v -> rounded.getValue());
         scale.setVisibility(v -> modifyPose.getValue());
         rotation.setVisibility(v -> modifyPose.getValue());
-        skewX.setVisibility(v -> modifyPose.getValue());
-        skewY.setVisibility(v -> modifyPose.getValue());
         resetPose.setVisibility(v -> modifyPose.getValue());
     }
 
@@ -67,10 +70,11 @@ public abstract class HudModule extends Module {
     @Subscribe
     public void onRender2DHud(Render2DEvent e) {
         if (nullCheck()) return;
-        if (mc.screen != null && !(mc.screen instanceof HudEditorScreen)) return;
 
         float x = getX();
         float y = getY();
+        
+        updateAnimations();
 
         if (mc.screen instanceof HudEditorScreen && button) {
             if (!dragging && isHovering() && HudEditorScreen.getInstance().currentDragging == null) {
@@ -94,10 +98,15 @@ public abstract class HudModule extends Module {
         }
 
         GuiGraphics context = e.getContext();
-
-        if (background.getValue()) {
-            RenderUtil.rect(context, x - 2, y - 2, x + width + 2, y + height + 2, bgColor.getValue().getRGB());
+        
+        context.pose().pushMatrix();
+        if (modifyPose.getValue()) {
+            context.pose().translate(x + width / 2f, y + height / 2f);
+            context.pose().scale(scale.getValue(), scale.getValue());
+            context.pose().translate(-(x + width / 2f), -(y + height / 2f));
         }
+
+        drawBackground(context, x, y);
 
         if (mc.screen instanceof HudEditorScreen) {
             boolean isThisDragging = HudEditorScreen.getInstance().currentDragging == this;
@@ -112,6 +121,34 @@ public abstract class HudModule extends Module {
         }
 
         drawContent(e);
+        
+        context.pose().popMatrix();
+    }
+    
+    protected void updateAnimations() {
+        float target = isHovering() ? 1.0f : 0.0f;
+        hoverAnim = me.alpha432.oxevy.util.render.AnimationUtil.animate(hoverAnim, target, 0.1f);
+    }
+    
+    protected void drawBackground(GuiGraphics context, float x, float y) {
+        if (!background.getValue()) return;
+        
+        int color = bgColor.getValue().getRGB();
+        if (rounded.getValue()) {
+            RenderUtil.roundRect(context, x - 2, y - 2, width + 4, height + 4, radius.getValue(), color);
+            if (outline.getValue()) {
+                // Simplified outline for rounded rect
+                RenderUtil.rect(context, x - 2, y - 2, x + width + 2, y - 1, outlineColor.getValue().getRGB());
+                RenderUtil.rect(context, x - 2, y + height + 1, x + width + 2, y + height + 2, outlineColor.getValue().getRGB());
+                RenderUtil.rect(context, x - 2, y - 2, x - 1, y + height + 2, outlineColor.getValue().getRGB());
+                RenderUtil.rect(context, x + width + 1, y - 2, x + width + 2, y + height + 2, outlineColor.getValue().getRGB());
+            }
+        } else {
+            RenderUtil.rect(context, x - 2, y - 2, x + width + 2, y + height + 2, color);
+            if (outline.getValue()) {
+                RenderUtil.rect(context, x - 2, y - 2, x + width + 2, y + height + 2, outlineColor.getValue().getRGB(), 1.0f);
+            }
+        }
     }
 
     @Subscribe

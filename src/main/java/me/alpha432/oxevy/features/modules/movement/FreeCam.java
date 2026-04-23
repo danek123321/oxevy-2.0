@@ -2,14 +2,15 @@ package me.alpha432.oxevy.features.modules.movement;
 
 import me.alpha432.oxevy.features.modules.Module;
 import me.alpha432.oxevy.features.settings.Setting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
 public class FreeCam extends Module {
 
-    private final Setting<Float> speed = num("Speed", 0.5f, 0.1f, 5.0f);
+    private final Setting<Float> speed = num("Speed", 1.0f, 0.5f, 5.0f);
     private final Setting<Boolean> noClip = bool("NoClip", true);
-    private final Setting<Boolean> freeze = bool("FreezePlayer", true);
 
     private Vec3 savedPosition;
     private float savedYaw;
@@ -17,21 +18,17 @@ public class FreeCam extends Module {
     private boolean wasFlying;
 
     public FreeCam() {
-        super("FreeCam", "Free camera movement while player stays in place", Category.MOVEMENT);
+        super("FreeCam", "Client-side spectator camera", Category.MOVEMENT);
     }
 
     @Override
     public void onEnable() {
         if (nullCheck()) return;
 
-        savedPosition = new Vec3(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+        savedPosition = mc.player.position();
         savedYaw = mc.player.getYRot();
         savedPitch = mc.player.getXRot();
         wasFlying = mc.player.getAbilities().flying;
-
-        if (freeze.getValue()) {
-            mc.player.getAbilities().flying = true;
-        }
     }
 
     @Override
@@ -52,9 +49,11 @@ public class FreeCam extends Module {
     public void onTick() {
         if (nullCheck()) return;
 
+        LocalPlayer player = mc.player;
+        
         double forward = 0;
         double strafe = 0;
-        float yaw = mc.player.getYRot();
+        float yaw = player.getYRot();
 
         if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_W) == 1) forward = 1;
         if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_S) == 1) forward = -1;
@@ -80,20 +79,19 @@ public class FreeCam extends Module {
 
         motionY = vertical * speedValue;
 
-        Vec3 pos = new Vec3(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+        Vec3 pos = player.position();
         double newX = pos.x + motionX;
         double newY = pos.y + motionY;
         double newZ = pos.z + motionZ;
 
         if (noClip.getValue()) {
-            mc.player.setPos(newX, newY, newZ);
+            player.setPos(newX, newY, newZ);
         } else {
             double clampedX = Math.max(-30000000, Math.min(30000000, newX));
             double clampedZ = Math.max(-30000000, Math.min(30000000, newZ));
-            mc.player.setPos(clampedX, newY, clampedZ);
+            player.setPos(clampedX, newY, clampedZ);
         }
 
-        mc.player.setYHeadRot(yaw);
+        player.setYHeadRot(yaw);
     }
-
 }

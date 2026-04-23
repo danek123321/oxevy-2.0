@@ -30,20 +30,21 @@ public class RenderUtil implements Util {
 
     // Per-frame cached values
     private static Vec3 cachedCameraPos = Vec3.ZERO;
-    private static long lastCameraUpdate = 0;
+    private static long lastCameraUpdateNanos = 0;
+    private static final long CAMERA_CACHE_NS = 16_000_000L; // ~60fps
 
     /**
      * Get cached camera position (updated once per frame).
      * Avoids repeated calls to getMainCamera().position()
      */
     public static Vec3 getCameraPos() {
-        long now = System.currentTimeMillis();
-        if (now - lastCameraUpdate > 16) { // ~60fps
+        long now = System.nanoTime();
+        if (now - lastCameraUpdateNanos > CAMERA_CACHE_NS) {
             Minecraft mc = Minecraft.getInstance();
             if (mc.gameRenderer != null && mc.gameRenderer.getMainCamera() != null) {
                 cachedCameraPos = mc.gameRenderer.getMainCamera().position();
             }
-            lastCameraUpdate = now;
+            lastCameraUpdateNanos = now;
         }
         return cachedCameraPos;
     }
@@ -52,7 +53,7 @@ public class RenderUtil implements Util {
      * Invalidates camera cache (call when camera changes drastically).
      */
     public static void invalidateCameraCache() {
-        lastCameraUpdate = 0;
+        lastCameraUpdateNanos = 0;
     }
 
     // Helper methods for 3D rendering
@@ -183,13 +184,31 @@ public class RenderUtil implements Util {
         context.fill(Math.round(x1), Math.round(y1), Math.round(x1) + w, Math.round(y2), color);
     }
 
+    public static void roundRect(GuiGraphics context, float x, float y, float w, float h, float radius, int color) {
+        // Simple approximation using 5 rects for now, or just use the fill method if we want it simple.
+        // For a "rich" feel, we can use a custom shader or many small rects, 
+        // but GuiGraphics doesn't easily support rounded rects out of the box without complex buffer manipulation.
+        // Let's use a 9-slice or just filled rects for now but make it look good.
+        context.fill((int) (x + radius), (int) y, (int) (x + w - radius), (int) (y + h), color);
+        context.fill((int) x, (int) (y + radius), (int) (x + radius), (int) (y + h - radius), color);
+        context.fill((int) (x + w - radius), (int) (y + radius), (int) (x + w), (int) (y + h - radius), color);
+        
+        // Corners (simplified as squares for now, can be improved)
+        context.fill((int) x, (int) y, (int) (x + radius), (int) (y + radius), color);
+        context.fill((int) (x + w - radius), (int) y, (int) (x + w), (int) (y + radius), color);
+        context.fill((int) x, (int) (y + h - radius), (int) (x + radius), (int) (y + h), color);
+        context.fill((int) (x + w - radius), (int) (y + h - radius), (int) (x + w), (int) (y + h), color);
+    }
+
     public static void horizontalGradient(GuiGraphics context, float x1, float y1, float x2, float y2, Color left, Color right) {
         int ix1 = Math.round(x1);
         int iy1 = Math.round(y1);
         int ix2 = Math.round(x2);
         int iy2 = Math.round(y2);
 
-        gradient(context, ix1, iy1, ix2, iy2, left.hashCode(), left.hashCode(), right.hashCode(), right.hashCode());
+        int l = left.getRGB();
+        int r = right.getRGB();
+        gradient(context, ix1, iy1, ix2, iy2, l, l, r, r);
     }
 
     public static void verticalGradient(GuiGraphics context, float x1, float y1, float x2, float y2, Color top, Color bottom) {
@@ -198,7 +217,9 @@ public class RenderUtil implements Util {
         int ix2 = Math.round(x2);
         int iy2 = Math.round(y2);
 
-        gradient(context, ix1, iy1, ix2, iy2, top.hashCode(), bottom.hashCode(), bottom.hashCode(), top.hashCode());
+        int t = top.getRGB();
+        int b = bottom.getRGB();
+        gradient(context, ix1, iy1, ix2, iy2, t, b, b, t);
     }
 
     public static void gradient(GuiGraphics graphics,
@@ -348,6 +369,32 @@ public class RenderUtil implements Util {
             bufferBuilder.addVertex(pose, px2, py2, pz2).setColor(color).setLineWidth(lineWidth);
         }
         (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
+    }
+
+    /**
+     * Loads a local image file into a Minecraft texture using reflection.
+     * @param f The image file to load.
+     * @param name The name to register the dynamic texture under.
+     * @return The Identifier of the loaded texture, or null if failed.
+     */
+    public static net.minecraft.resources.Identifier loadTexture(java.io.File f, String name) {
+        if (!f.exists()) return null;
+        try (java.io.InputStream fis = new java.io.FileInputStream(f)) {
+            // Use reflection to avoid compile-time dependency on mappings if they are tricky
+            Class<?> nativeImageClass = Class.forName("net.minecraft.client.texture.NativeImage");
+            java.lang.reflect.Method read = nativeImageClass.getMethod("read", java.io.InputStream.class);
+            Object img = read.invoke(null, fis);
+
+            Class<?> nativeTexClass = Class.forName("net.minecraft.client.texture.NativeImageBackedTexture");
+            java.lang.reflect.Constructor<?> texCtor = nativeTexClass.getConstructor(nativeImageClass);
+            Object tex = texCtor.newInstance(img);
+
+            Object textureManager = Minecraft.getInstance().getTextureManager();
+            java.lang.reflect.Method registerMethod = textureManager.getClass().getMethod("registerDynamicTexture", String.class, nativeTexClass);
+            return (net.minecraft.resources.Identifier) registerMethod.invoke(textureManager, name, tex);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     public static PoseStack matrixFrom(Vec3 pos) {

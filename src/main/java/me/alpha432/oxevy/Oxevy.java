@@ -11,6 +11,12 @@ import org.apache.logging.log4j.Logger;
 public class Oxevy implements ModInitializer, ClientModInitializer {
     public static float TIMER = 1f;
 
+    public static boolean hitboxesEnabled = false;
+    public static float hitboxesExpand = 1.5f;
+    public static boolean hitboxesEntities = true;
+    public static boolean hitboxesPlayers = true;
+    public static boolean hitboxesMobs = true;
+
     public static final Logger LOGGER = LogManager.getLogger("Oxevy");
     public static ServerManager serverManager;
     public static ColorManager colorManager;

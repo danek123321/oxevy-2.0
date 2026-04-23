@@ -18,7 +18,7 @@ public class AutoTotemModule extends Module {
         if (mc.player == null || !mc.player.isAlive()) return;
 
         ItemStack offhand = mc.player.getOffhandItem();
-        
+
         // Already have totem
         if (offhand.getItem() == Items.TOTEM_OF_UNDYING) {
             return;

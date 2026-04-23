@@ -8,38 +8,13 @@ import me.alpha432.oxevy.event.impl.render.Render3DEvent;
 import me.alpha432.oxevy.features.Feature;
 import me.alpha432.oxevy.features.commands.ModuleCommand;
 import me.alpha432.oxevy.features.modules.Module;
-import me.alpha432.oxevy.features.modules.client.ClickGuiModule;
-import me.alpha432.oxevy.features.modules.client.PingSpoof;
-import me.alpha432.oxevy.features.modules.client.ClientSpoof;
-import me.alpha432.oxevy.features.modules.client.HudEditorModule;
-import me.alpha432.oxevy.features.modules.client.NotificationsModule;
-import me.alpha432.oxevy.features.modules.combat.AimBotModule;
-import me.alpha432.oxevy.features.modules.combat.CriticalsModule;
-import me.alpha432.oxevy.features.modules.combat.KeyPearlModule;
-import me.alpha432.oxevy.features.modules.combat.KillAuraModule;
-import me.alpha432.oxevy.features.modules.hud.ArrayListHudModule;
-import me.alpha432.oxevy.features.modules.hud.CoordinatesHudModule;
-import me.alpha432.oxevy.features.modules.hud.FpsHudModule;
-import me.alpha432.oxevy.features.modules.hud.ServerInfoHudModule;
-import me.alpha432.oxevy.features.modules.hud.TargetHudModule;
-import me.alpha432.oxevy.features.modules.hud.WatermarkHudModule;
-import me.alpha432.oxevy.features.modules.misc.MCFModule;
-import me.alpha432.oxevy.features.modules.combat.Strafe;
-import me.alpha432.oxevy.features.modules.movement.Flight;
-import me.alpha432.oxevy.features.modules.movement.ReverseStepModule;
-import me.alpha432.oxevy.features.modules.movement.SpeedBuff;
-import me.alpha432.oxevy.features.modules.movement.StepModule;
-import me.alpha432.oxevy.features.modules.player.FastPlaceModule;
-import me.alpha432.oxevy.features.modules.player.NoFallModule;
-import me.alpha432.oxevy.features.modules.player.VelocityModule;
-import me.alpha432.oxevy.features.modules.render.BlockHighlightModule;
-import me.alpha432.oxevy.features.modules.render.ChestESPModule;
-import me.alpha432.oxevy.features.modules.render.TracerModule;
-import me.alpha432.oxevy.features.modules.render.ESP;
-import me.alpha432.oxevy.features.modules.render.HealthBarModule;
-import me.alpha432.oxevy.features.modules.render.NametagsModule;
-// TracerModule removed to avoid cross-package conflicts; Autotool module is used instead
-import me.alpha432.oxevy.features.modules.misc.AutoToolModule;
+import me.alpha432.oxevy.features.modules.client.*;
+import me.alpha432.oxevy.features.modules.combat.*;
+import me.alpha432.oxevy.features.modules.hud.*;
+import me.alpha432.oxevy.features.modules.misc.*;
+import me.alpha432.oxevy.features.modules.movement.*;
+import me.alpha432.oxevy.features.modules.player.*;
+import me.alpha432.oxevy.features.modules.render.*;
 import me.alpha432.oxevy.util.traits.Jsonable;
 import me.alpha432.oxevy.util.traits.Util;
 import org.slf4j.Logger;
@@ -55,43 +30,109 @@ public class ModuleManager implements Jsonable, Util {
     private final List<Module> modules = new ArrayList<>();
 
     public void init() {
+        // CLIENT
+        register(new ClickGuiModule());
+        register(new HudEditorModule());
+        register(new NotificationsModule());
+        register(new ClientSpoof());
+        register(new fakeplayer());
+        register(new RPCModule());
+
+        // COMBAT
+        register(new KillAuraModule());
+        register(new AimBotModule());
+        register(new CriticalsModule());
+        register(new KeyPearlModule());
+        register(new Strafe());
+        register(new AutoCobwebModule());
+        register(new AutoTotemModule());
+        register(new AutoTrapModule());
+        register(new HitboxesModule());
+        register(new ReachModule());
+
+        // HUD
         register(new WatermarkHudModule());
         register(new CoordinatesHudModule());
         register(new FpsHudModule());
         register(new ServerInfoHudModule());
         register(new ArrayListHudModule());
+        register(new KeystrokesHudModule());
+        register(new PotionEffectsHudModule());
         register(new TargetHudModule());
-        register(new HudEditorModule());
-        register(new ClickGuiModule());
-        register(new NotificationsModule());
-        register(new KillAuraModule());
-        register(new AimBotModule());
-        register(new CriticalsModule());
+        register(new TargetInfoHudModule());
+        register(new ArmorHudModule());
+        register(new MenuWatermark());
+
+        // MISC
         register(new MCFModule());
+        register(new AutoToolModule());
+
+        // MOVEMENT
         register(new StepModule());
         register(new ReverseStepModule());
-        register(new SpeedBuff());
+        register(new SpeedHack());
         register(new Flight());
-        register(new Strafe());
+        register(new FreeCam());
+        register(new ScaffoldModule());
+        register(new TimerModule());
+        register(new SprintModule());
+        register(new NoSlowModule());
+        register(new SpiderModule());
+        register(new SafeWalkModule());
+        register(new BlinkModule());
+
+        // PLAYER
         register(new FastPlaceModule());
         register(new VelocityModule());
+        register(new NoFallModule());
+        register(new AirPlaceModule());
+        register(new AntiCobwebModule());
+        register(new AutoEatModule());
+        register(new FastBreakModule());
+        register(new NukerModule());
+        register(new AutoClickerModule());
+        register(new AutoRespawnModule());
+
+        // RENDER
         register(new BlockHighlightModule());
         register(new NametagsModule());
-        register(new HealthBarModule());
         register(new ChestESPModule());
         register(new TracerModule());
-        // Expose client spoofing toggles in the ClickGui as first-class modules
-        register(new PingSpoof());
-        register(new ClientSpoof());
-        // Keybind HUD feature disabled on revert
-        register(new ESP());
-        register(new AutoToolModule());
-        register(new NoFallModule());
-        register(new KeyPearlModule());
+        register(new FullbrightModule());
+
+        // Set default enabled modules
+        FpsHudModule fps = (FpsHudModule) getModuleByClass(FpsHudModule.class);
+        if (fps != null) {
+            fps.enable();
+            fps.showMinMax.setValue(false);
+            fps.showAverage.setValue(true);
+            fps.showFrameTime.setValue(false);
+            fps.showGraph.setValue(false);
+            fps.performanceWarnings.setValue(false);
+        }
+
+        ArrayListHudModule arrayList = (ArrayListHudModule) getModuleByClass(ArrayListHudModule.class);
+        if (arrayList != null) {
+            arrayList.enable();
+        }
+
+        NotificationsModule notifs = (NotificationsModule) getModuleByClass(NotificationsModule.class);
+        if (notifs != null) {
+            notifs.enable();
+        }
+
+        KillAuraModule killAura = (KillAuraModule) getModuleByClass(KillAuraModule.class);
+        if (killAura != null) {
+            killAura.setBind(org.lwjgl.glfw.GLFW.GLFW_KEY_R);
+        }
+
+        FullbrightModule fullbright = (FullbrightModule) getModuleByClass(FullbrightModule.class);
+        if (fullbright != null) {
+            fullbright.enable();
+        }
 
         LOGGER.info("Registered {} modules", modules.size());
 
-        // Create a command for each module for modules to be configurable via command line
         for (Module module : modules) {
             Oxevy.commandManager.register(new ModuleCommand(module));
         }

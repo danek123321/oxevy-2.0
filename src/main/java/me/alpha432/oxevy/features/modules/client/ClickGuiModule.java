@@ -5,6 +5,8 @@ import me.alpha432.oxevy.event.impl.ClientEvent;
 import me.alpha432.oxevy.event.system.Subscribe;
 import me.alpha432.oxevy.features.commands.Command;
 import me.alpha432.oxevy.features.gui.OxevyGui;
+import me.alpha432.oxevy.features.gui.OxevySettingsScreen;
+import me.alpha432.oxevy.features.gui.SoupSettingsScreen;
 import me.alpha432.oxevy.features.modules.Module;
 import me.alpha432.oxevy.features.settings.Bind;
 import me.alpha432.oxevy.features.settings.Setting;
@@ -16,18 +18,15 @@ public class ClickGuiModule extends Module {
     private static ClickGuiModule INSTANCE;
 
     public Setting<String> prefix = str("Prefix", ".");
-    public Setting<Color> color = color("Color", 0, 0, 255, 180);
-    public Setting<ColorPreset> colorPreset = mode("ColorPreset", ColorPreset.CUSTOM);
-    public Setting<Color> topColor = color("TopColor", 0, 0, 150, 240);
+    public Setting<Color> color = color("Color", 0, 100, 255, 255);
+    public Setting<ColorPreset> colorPreset = mode("ColorPreset", ColorPreset.BLUE);
+    public Setting<Color> topColor = color("TopColor", 0, 80, 150, 255);
     public Setting<Boolean> rainbow = bool("Rainbow", false);
     public Setting<Integer> rainbowHue = num("Delay", 240, 0, 600);
     public Setting<Float> rainbowBrightness = num("Brightness", 150.0f, 1.0f, 255.0f);
     public Setting<Float> rainbowSaturation = num("Saturation", 150.0f, 1.0f, 255.0f);
     public Setting<Float> nameTagOffset = num("NameTagOffset", 1.2f, 0.5f, 3.0f);
     public Setting<Float> healthBarOffset = num("HealthBarOffset", 1.0f, 0.5f, 3.0f);
-    public Setting<Boolean> searchBarEnabled = bool("SearchBarEnabled", true);
-    public Setting<String> searchBar = str("SearchBar", "");
-    public Setting<Bind> searchToggleBind = key("SearchToggleBind", new Bind(GLFW.GLFW_KEY_F));
     
     // Animation settings
     public Setting<Boolean> animationsEnabled = bool("AnimationsEnabled", true);
@@ -41,8 +40,9 @@ public class ClickGuiModule extends Module {
         rainbowHue.setVisibility(v -> rainbow.getValue());
         rainbowBrightness.setVisibility(v -> rainbow.getValue());
         rainbowSaturation.setVisibility(v -> rainbow.getValue());
-        searchBar.setVisibility(v -> searchBarEnabled.getValue());
-        searchToggleBind.setVisibility(v -> searchBarEnabled.getValue());
+        color.setVisibility(v -> !rainbow.getValue());
+        topColor.setVisibility(v -> !rainbow.getValue());
+        colorPreset.setVisibility(v -> !rainbow.getValue());
         INSTANCE = this;
     }
 
@@ -58,8 +58,18 @@ public class ClickGuiModule extends Module {
             }
             if (event.getSetting().equals(this.colorPreset)) {
                 ColorPreset preset = this.colorPreset.getPlannedValue();
-                if (preset != ColorPreset.CUSTOM) {
-                    Oxevy.colorManager.setTargetColor(preset.getColor());
+                if (preset != ColorPreset.CUSTOM && preset.getColor() != null) {
+                    this.color.setValue(preset.getColor());
+                    Oxevy.colorManager.setColor(preset.getColor());
+                }
+            }
+            if (event.getSetting().equals(this.rainbow)) {
+                if (this.rainbow.getValue()) {
+                    color.setVisibility(v -> false);
+                    topColor.setVisibility(v -> false);
+                } else {
+                    color.setVisibility(v -> true);
+                    topColor.setVisibility(v -> true);
                 }
             }
         }
@@ -70,7 +80,7 @@ public class ClickGuiModule extends Module {
         if (nullCheck()) {
             return;
         }
-        mc.setScreen(OxevyGui.getClickGui());
+        OxevySettingsScreen.open();
     }
 
     @Override
@@ -81,16 +91,9 @@ public class ClickGuiModule extends Module {
 
     @Override
     public void onTick() {
-        if (!(ClickGuiModule.mc.screen instanceof OxevyGui)) {
+        if (!(ClickGuiModule.mc.screen instanceof OxevySettingsScreen) && !(ClickGuiModule.mc.screen instanceof SoupSettingsScreen)) {
             this.disable();
             return;
-        }
-        
-        // Handle search toggle bind (Ctrl + F)
-        boolean ctrlPressed = GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_LEFT_CONTROL) == 1 || 
-                              GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_RIGHT_CONTROL) == 1;
-        if (ctrlPressed && searchToggleBind.getValue().isDown()) {
-            searchBarEnabled.setValue(!searchBarEnabled.getValue());
         }
     }
 

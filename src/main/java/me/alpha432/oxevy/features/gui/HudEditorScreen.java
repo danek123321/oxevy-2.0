@@ -1,10 +1,9 @@
 package me.alpha432.oxevy.features.gui;
 
 import me.alpha432.oxevy.Oxevy;
-import me.alpha432.oxevy.features.Feature;
-import me.alpha432.oxevy.features.gui.items.buttons.ModuleButton;
-import me.alpha432.oxevy.features.modules.Module;
-import me.alpha432.oxevy.features.modules.client.HudModule;
+import me.alpha432.oxevy.features.modules.hud.HudModule;
+import me.alpha432.oxevy.util.render.RenderUtil;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -12,68 +11,66 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class HudEditorScreen extends Screen {
+    private static final Minecraft mc = Minecraft.getInstance();
     private static HudEditorScreen INSTANCE;
 
-    private final ArrayList<Widget> components = new ArrayList<>();
     public HudModule currentDragging;
     public boolean anyHover;
 
     private HudEditorScreen() {
-        super(Component.literal("oxevy-hudeditor"));
-        load();
-    }
-
-    private void load() {
-        Widget hud = new Widget("Hud", 50, 50, true);
-        Oxevy.moduleManager.stream()
-                .filter(m -> m.getCategory() == Module.Category.HUD && !m.hidden)
-                .map(ModuleButton::new)
-                .forEach(hud::addButton);
-        this.components.add(hud);
-        this.components.forEach(component -> component.getItems().sort(Comparator.comparing(Feature::getName)));
+        super(Component.literal("HUD Editor"));
     }
 
     @Override
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+        me.alpha432.oxevy.features.gui.items.Item.context = context;
         anyHover = false;
-        this.components.forEach(component -> component.drawScreen(context, mouseX, mouseY, delta));
+        
+        // Background tint
+        context.fill(0, 0, context.guiWidth(), context.guiHeight(), 0x44000000);
+        
+        // Guide lines
+        int centerX = context.guiWidth() / 2;
+        int centerY = context.guiHeight() / 2;
+        RenderUtil.rect(context, centerX, 0, centerX + 1, context.guiHeight(), 0x22FFFFFF);
+        RenderUtil.rect(context, 0, centerY, context.guiWidth(), centerY + 1, 0x22FFFFFF);
+        
+        // Render HUD modules
+        List<HudModule> modules = Oxevy.moduleManager.getModules().stream()
+                .filter(m -> m instanceof HudModule && m.isEnabled())
+                .map(m -> (HudModule) m)
+                .collect(Collectors.toList());
+
+        for (HudModule module : modules) {
+            module.onRender2DHud(new me.alpha432.oxevy.event.impl.render.Render2DEvent(context, delta));
+        }
+        
+        // Editor instructions
+        String text = "HUD Editor - Drag modules to reposition";
+        context.drawString(mc.font, text, (context.guiWidth() - mc.font.width(text)) / 2, 10, 0xFFAAAAAA);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
-        this.components.forEach(component -> component.mouseClicked((int) click.x(), (int) click.y(), click.button()));
         return super.mouseClicked(click, doubled);
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent click) {
-        this.components.forEach(component -> component.mouseReleased((int) click.x(), (int) click.y(), click.button()));
         return super.mouseReleased(click);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (verticalAmount < 0) {
-            this.components.forEach(component -> component.setY(component.getY() - 10));
-        } else if (verticalAmount > 0) {
-            this.components.forEach(component -> component.setY(component.getY() + 10));
-        }
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-    }
-
-    @Override
     public boolean keyPressed(KeyEvent input) {
-        this.components.forEach(component -> component.onKeyPressed(input.input()));
         return super.keyPressed(input);
     }
 
     @Override
     public boolean charTyped(CharacterEvent input) {
-        this.components.forEach(component -> component.onKeyTyped(input.codepointAsString(), input.modifiers()));
         return super.charTyped(input);
     }
 
@@ -82,12 +79,8 @@ public class HudEditorScreen extends Screen {
         return false;
     }
 
-    @Override // ignore 1.21.8 menu blur thing
+    @Override
     public void renderBackground(GuiGraphics context, int mouseX, int mouseY, float delta) {
-    }
-
-    public ArrayList<Widget> getComponents() {
-        return components;
     }
 
     public static HudEditorScreen getInstance() {

@@ -106,6 +106,19 @@ public class ConfigManager {
                     LOGGER.error("Error parsing position for: {} : {}", feature.getName(), setting.getName());
                 }
             }
+            case "Position" -> {
+                try {
+                    String posStr = element.getAsString();
+                    String[] parts = posStr.split(",");
+                    if (parts.length == 2) {
+                        float x = Float.parseFloat(parts[0]);
+                        float y = Float.parseFloat(parts[1]);
+                        setting.setValue(new Vector2f(x, y));
+                    }
+                } catch (Exception exception) {
+                    LOGGER.error("Error parsing position for: {} : {}", feature.getName(), setting.getName());
+                }
+            }
             case "Enum" -> {
                 try {
                     EnumConverter converter = new EnumConverter(setting.getValue().getClass());
@@ -114,6 +127,9 @@ public class ConfigManager {
                 } catch (Exception exception) {
                     LOGGER.error("Error parsing enum for {}.{}: {}", feature.getName(), setting.getName(), exception);
                 }
+            }
+            case "Runnable" -> {
+                // Runnable settings are not serializable, ignore
             }
             default -> LOGGER.error("Unknown Setting type for: {} : {}", feature.getName(), setting.getName());
         }

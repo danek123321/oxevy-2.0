@@ -2,40 +2,42 @@ package me.alpha432.oxevy.features.modules.hud;
 
 import me.alpha432.oxevy.Oxevy;
 import me.alpha432.oxevy.event.impl.render.Render2DEvent;
-import me.alpha432.oxevy.features.modules.client.HudModule;
+import me.alpha432.oxevy.features.modules.client.ClickGuiModule;
 import me.alpha432.oxevy.features.modules.Module;
 import me.alpha432.oxevy.features.settings.Setting;
 import me.alpha432.oxevy.util.render.AnimationUtil;
+import me.alpha432.oxevy.util.ColorUtil;
+import me.alpha432.oxevy.util.render.RenderUtil;
 import net.minecraft.client.gui.GuiGraphics;
 
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public class ArrayListHudModule extends HudModule {
-    public final Setting<Boolean> sortAlphabetical = bool("SortAlphabetical", true);
-    public final Setting<Boolean> showEnabledOnly = bool("ShowEnabledOnly", true);
-    public final Setting<Boolean> showBackground = bool("Background", true);
-    public final Setting<Integer> bgOpacity = num("BackgroundOpacity", 120, 0, 255);
-    public final Setting<Boolean> rainbow = bool("Rainbow", false);
-    public final Setting<Boolean> outline = bool("Outline", false);
+    public final Setting<Boolean> sortAlphabetical = bool("SortAlphabetical", false);
+    public final Setting<Boolean> rainbow = bool("Rainbow", true);
     public final Setting<Boolean> smoothAnimations = bool("SmoothAnimations", true);
     public final Setting<Float> animationSpeed = num("AnimationSpeed", 0.15f, 0.05f, 0.5f);
+    public final Setting<Boolean> bar = bool("Bar", true);
+    public final Setting<Integer> spacing = num("Spacing", 1, 0, 5);
 
-    // Animation tracking
     private final Map<Module, Float> moduleAnimations = new HashMap<>();
-    private final Map<Module, Float> modulePositions = new HashMap<>();
+    private final List<Module> enabledModules = new ArrayList<>(128);
+    private final Map<Module, Integer> cachedNameWidths = new HashMap<>(128);
+    private final Set<Module> enabledSet = new HashSet<>(128);
 
     public ArrayListHudModule() {
         super("ArrayList", "Shows enabled modules", 100, 50);
     }
 
     @Override
-    protected void render(Render2DEvent e) {
-        super.render(e);
-
+    public void drawContent(Render2DEvent e) {
         GuiGraphics ctx = e.getContext();
         float x = getX();
         float y = getY();
@@ -43,78 +45,89 @@ public class ArrayListHudModule extends HudModule {
         float drawY = y;
         float maxWidth = 0;
 
-        // Get enabled modules
-        List<Module> enabledModules = new ArrayList<>();
+        enabledModules.clear();
+        enabledSet.clear();
+        cachedNameWidths.clear();
         for (Module module : Oxevy.moduleManager.getModules()) {
-            if (module.isEnabled() && !module.hidden) {
+            if ((module.isEnabled() || (smoothAnimations.getValue() && moduleAnimations.getOrDefault(module, 0f) > 0.01f)) 
+                && !module.hidden && module.getCategory() != Module.Category.HUD) {
                 enabledModules.add(module);
+                if (module.isEnabled()) enabledSet.add(module);
             }
         }
 
-        // Sort modules
-        if (sortAlphabetical.getValue()) {
-            enabledModules.sort(Comparator.comparing(Module::getName));
+        // Cache name widths once per frame; used for sorting and alignment.
+        for (Module module : enabledModules) {
+            cachedNameWidths.put(module, mc.font.width(module.getName()));
         }
 
-        // Render each module with animations
+        if (sortAlphabetical.getValue()) {
+            enabledModules.sort(Comparator.comparing(Module::getName));
+        } else {
+            enabledModules.sort((m1, m2) -> Integer.compare(
+                cachedNameWidths.getOrDefault(m2, 0),
+                cachedNameWidths.getOrDefault(m1, 0)
+            ));
+        }
+
+        for (Module module : enabledModules) {
+            maxWidth = Math.max(maxWidth, cachedNameWidths.getOrDefault(module, 0));
+        }
+        
+        setWidth(maxWidth + (bar.getValue() ? 6 : 4));
+        setHeight(enabledModules.isEmpty() ? 10 : enabledModules.size() * (lineHeight + spacing.getValue()));
+        
+        int screenWidth = mc.getWindow().getGuiScaledWidth();
+        boolean isLeft = x < screenWidth / 2.0f;
+
+        final boolean doRainbow = rainbow.getValue();
+        final boolean doSmooth = smoothAnimations.getValue();
+        final float speed = doSmooth ? animationSpeed.getValue() : 1.0f;
+        final int baseColor = ClickGuiModule.getInstance().color.getValue().getRGB();
+        
         for (int i = 0; i < enabledModules.size(); i++) {
             Module module = enabledModules.get(i);
             String text = module.getName();
-            int textWidth = mc.font.width(text);
-            maxWidth = Math.max(maxWidth, textWidth);
+            int textWidth = cachedNameWidths.getOrDefault(module, mc.font.width(text));
 
-            // Update animation for this module
-            float targetAnim = 1.0f;
-            if (!moduleAnimations.containsKey(module)) {
-                moduleAnimations.put(module, 0.0f);
-            }
+            float targetAnim = enabledSet.contains(module) ? 1.0f : 0.0f;
+            moduleAnimations.putIfAbsent(module, 0.0f);
             float currentAnim = moduleAnimations.get(module);
-            float speed = smoothAnimations.getValue() ? animationSpeed.getValue() : 1.0f;
-            currentAnim = AnimationUtil.animate(currentAnim, targetAnim, speed, AnimationUtil.Easing.EASE_OUT_BACK);
+            currentAnim = AnimationUtil.animate(currentAnim, targetAnim, speed, AnimationUtil.Easing.EASE_OUT);
             moduleAnimations.put(module, currentAnim);
 
-            // Calculate position with slide-in animation
-            float slideOffset = smoothAnimations.getValue() ? (1.0f - currentAnim) * 20.0f : 0.0f;
-            float animatedX = x + slideOffset;
-            float alpha = smoothAnimations.getValue() ? currentAnim : 1.0f;
+            if (currentAnim < 0.01f && !enabledSet.contains(module)) continue;
 
-            // Background with animation
-            if (showBackground.getValue()) {
-                int bgAlpha = (int) (bgOpacity.getValue() * alpha);
-                ctx.fill((int) animatedX - 2, (int) drawY - 1, (int) animatedX + textWidth + 2, (int) drawY + lineHeight + 1, 
-                    (bgAlpha << 24) | 0x11_11_11);
-            }
-
-            // Outline with animation
-            if (outline.getValue()) {
-                int outlineAlpha = (int) (255 * alpha);
-                ctx.fill((int) animatedX - 3, (int) drawY - 2, (int) animatedX + textWidth + 3, (int) drawY - 1, (outlineAlpha << 24));
-                ctx.fill((int) animatedX - 3, (int) drawY + lineHeight + 1, (int) animatedX + textWidth + 3, (int) drawY + lineHeight + 2, (outlineAlpha << 24));
-                ctx.fill((int) animatedX - 3, (int) drawY - 1, (int) animatedX - 2, (int) drawY + lineHeight + 1, (outlineAlpha << 24));
-                ctx.fill((int) animatedX + textWidth + 2, (int) drawY - 1, (int) animatedX + textWidth + 3, (int) drawY + lineHeight + 1, (outlineAlpha << 24));
-            }
-
-            // Draw module name with color and animation
-            int color = Oxevy.colorManager.getColor().getRGB();
-            if (rainbow.getValue()) {
-                color = (int) (System.currentTimeMillis() / 10 % 360);
-                color = java.awt.Color.HSBtoRGB(color / 360f, 0.8f, 1.0f);
-            }
+            int color = doRainbow 
+                ? Color.getHSBColor(((System.currentTimeMillis() + (i * 200)) / 10 % 360) / 360f, 0.7f, 1.0f).getRGB()
+                : baseColor;
             
-            // Apply alpha to color
-            int alphaComponent = (int) (alpha * 255);
-            int finalColor = (alphaComponent << 24) | (color & 0x00FFFFFF);
+            int finalColor = AnimationUtil.interpolateColor(0, color, currentAnim);
             
-            ctx.drawString(mc.font, text, (int) animatedX, (int) drawY, finalColor);
+            int textX;
+            if (isLeft) {
+                textX = (int) (x + 2 + (bar.getValue() ? 2 : 0));
+                if (bar.getValue()) {
+                    RenderUtil.rect(ctx, x, drawY, x + 2, drawY + lineHeight + spacing.getValue(), color);
+                }
+            } else {
+                textX = (int) (x + getWidth() - 2 - textWidth - (bar.getValue() ? 2 : 0));
+                if (bar.getValue()) {
+                    RenderUtil.rect(ctx, x + getWidth() - 2, drawY, x + getWidth(), drawY + lineHeight + spacing.getValue(), color);
+                }
+            }
 
-            drawY += lineHeight + 1;
+            ctx.pose().pushMatrix();
+            if (doSmooth) {
+                float slide = (1.0f - currentAnim) * (isLeft ? -20 : 20);
+                ctx.pose().translate(slide, 0);
+            }
+            ctx.drawString(mc.font, text, textX, (int) (drawY + spacing.getValue() / 2f), finalColor);
+            ctx.pose().popMatrix();
+
+            drawY += lineHeight + spacing.getValue();
         }
 
-        // Clean up animations for disabled modules
-        moduleAnimations.entrySet().removeIf(entry -> 
-            !enabledModules.contains(entry.getKey()) && entry.getValue() >= 1.0f);
-
-        setWidth(Math.max(getWidth(), maxWidth + 4));
-        setHeight(drawY - y);
+        moduleAnimations.entrySet().removeIf(entry -> !enabledSet.contains(entry.getKey()) && entry.getValue() < 0.01f);
     }
 }

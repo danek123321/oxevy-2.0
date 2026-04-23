@@ -27,7 +27,7 @@ public class AutoToolModule extends Module {
     @Override
     public void onEnable() {
         super.onEnable();
-        lastSelectedSlot = -1;
+        lastSelectedSlot = InventoryUtil.selected();
         swappedThisSession = false;
     }
 

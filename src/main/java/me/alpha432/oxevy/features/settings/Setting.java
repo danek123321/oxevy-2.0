@@ -4,6 +4,7 @@ import me.alpha432.oxevy.event.impl.ClientEvent;
 import me.alpha432.oxevy.features.Feature;
 import org.joml.Vector2f;
 
+import java.awt.Color;
 import java.util.Objects;
 import java.util.function.Predicate;
 
@@ -210,6 +211,9 @@ public class Setting<T> {
     }
 
     public String getType() {
+        if (this.value instanceof Runnable) {
+            return "Runnable";
+        }
         if (this.isEnumSetting()) {
             return "Enum";
         }
@@ -243,11 +247,21 @@ public class Setting<T> {
     }
 
     public boolean isColorSetting() {
-        return this.value instanceof java.awt.Color;
+        return this.value instanceof Color;
     }
 
     public boolean isVec2fSetting() {
         return this.value instanceof Vector2f;
+    }
+
+    public boolean isButtonSetting() {
+        return this.value instanceof Runnable;
+    }
+
+    public void run() {
+        if (isButtonSetting()) {
+            ((Runnable) this.value).run();
+        }
     }
 
     public T getDefaultValue() {
@@ -255,7 +269,12 @@ public class Setting<T> {
     }
 
     public String getValueAsString() {
-        return this.value.toString();
+        Object v = this.value;
+        if (v == null) return "null";
+        if (v instanceof Color c) {
+            return String.format("#%02X%02X%02X%02X", c.getRed(), c.getGreen(), c.getBlue(), c.getAlpha());
+        }
+        return v.toString();
     }
 
     public boolean hasRestriction() {

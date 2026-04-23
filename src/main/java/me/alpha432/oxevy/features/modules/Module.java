@@ -11,16 +11,19 @@ import me.alpha432.oxevy.features.commands.Command;
 import me.alpha432.oxevy.features.settings.Bind;
 import me.alpha432.oxevy.features.settings.Setting;
 import me.alpha432.oxevy.manager.ConfigManager;
+import me.alpha432.oxevy.util.ColorUtil;
 import me.alpha432.oxevy.util.traits.Jsonable;
 import me.alpha432.oxevy.util.traits.Toggleable;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.sounds.SoundEvents;
 import org.joml.Vector2f;
 
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN;
 
 public class Module extends Feature implements Jsonable, Toggleable {
     private final String description;
-    private final Category category;
+    private Category category;
 
     public final Setting<Boolean> enabled = bool("Enabled", false);
     public final Setting<Boolean> drawn = bool("Drawn", true);
@@ -68,6 +71,9 @@ public class Module extends Feature implements Jsonable, Toggleable {
         this.enabled.setValue(true);
         EVENT_BUS.register(this);
         EVENT_BUS.post(new ClientEvent(ClientEvent.Type.TOGGLE_MODULE, this));
+        if (mc.getSoundManager() != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+        }
         this.onToggle();
         this.onEnable();
     }
@@ -76,6 +82,9 @@ public class Module extends Feature implements Jsonable, Toggleable {
         this.enabled.setValue(false);
         EVENT_BUS.unregister(this);
         EVENT_BUS.post(new ClientEvent(ClientEvent.Type.TOGGLE_MODULE, this));
+        if (mc.getSoundManager() != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.8f));
+        }
         this.onToggle();
         this.onDisable();
     }
@@ -140,6 +149,7 @@ public class Module extends Feature implements Jsonable, Toggleable {
     @Override
     public JsonElement toJson() {
         JsonObject object = new JsonObject();
+        object.addProperty("Category", category.name());
         for (Setting<?> setting : getSettings()) {
             try {
                 if (setting.getValue() instanceof Bind keyBind) {
@@ -162,6 +172,20 @@ public class Module extends Feature implements Jsonable, Toggleable {
     public void fromJson(JsonElement element) {
         if (element == null || element.isJsonNull()) return;
         JsonObject object = element.getAsJsonObject();
+        // Load category if present
+        if (object.has("Category")) {
+            try {
+                String categoryName = object.get("Category").getAsString();
+                for (Category cat : Category.values()) {
+                    if (cat.name().equalsIgnoreCase(categoryName)) {
+                        this.category = cat;
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                Oxevy.LOGGER.error("Failed to load category from JSON", e);
+            }
+        }
         if (object.has("Enabled")) {
             String enabled = object.get("Enabled").getAsString();
             if (Boolean.parseBoolean(enabled)) toggle();

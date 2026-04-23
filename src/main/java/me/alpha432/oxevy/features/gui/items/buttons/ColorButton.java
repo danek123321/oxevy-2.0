@@ -135,9 +135,15 @@ public class ColorButton extends Button {
 
     @Override
     public void mouseClicked(int mouseX, int mouseY, int mouseButton) {
-        if (this.isHovering(mouseX, mouseY) && mouseButton == 1) {
-            open = !open;
-            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1f));
+        if (this.isHovering(mouseX, mouseY)) {
+            if (mouseButton == 0) {
+                open = !open;
+                mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1f));
+            }
+        }
+
+        if (!open) {
+            return;
         }
 
         if (mouseButton == 0) {

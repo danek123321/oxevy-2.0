@@ -43,4 +43,8 @@ public interface SettingFactory {
         return register(new Setting<>(name, new Vector2f(x, y)));
     }
 
+    default Setting<Runnable> button(String name, Runnable runnable) {
+        return register(new Setting<>(name, runnable));
+    }
+
 }

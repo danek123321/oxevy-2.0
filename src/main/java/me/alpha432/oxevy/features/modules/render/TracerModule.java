@@ -5,10 +5,12 @@ import me.alpha432.oxevy.event.impl.render.Render3DEvent;
 import me.alpha432.oxevy.features.modules.Module;
 import me.alpha432.oxevy.features.settings.Setting;
 import me.alpha432.oxevy.util.render.RenderUtil;
+import me.alpha432.oxevy.util.ColorUtil;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+
 import java.awt.Color;
 
 /**
