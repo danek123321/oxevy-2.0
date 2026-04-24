@@ -4,7 +4,7 @@
 
 **!!!!WARNING THIS PROJECT IS IN BETA!!!!**
 
-**An AI based hack client on OyVey-Ported**
+**An AI based utility client on OyVey-Ported**
 
 Built with: ChatGPT • DeepSeek • OpenCode • Gemini • Cursor
 
