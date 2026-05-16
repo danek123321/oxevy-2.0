@@ -7,13 +7,16 @@ import me.alpha432.oxevy.util.MathUtil;
 import java.awt.*;
 
 public class ColorManager {
-    private Color color = new Color(0, 0, 255, 180);
-    private Color targetColor = new Color(0, 0, 255, 180);
+    private Color color = new Color(0, 255, 0, 180);
+    private Color targetColor = new Color(0, 255, 0, 180);
     private static final float LERP_SPEED = 4f;
 
     public void init() {
         ClickGuiModule ui = ClickGuiModule.getInstance();
-        setColor(ui.color.getValue());
+        Color green = new Color(0, 255, 0, 255);
+        ui.color.setValueNoEvent(green);
+        ui.colorPreset.setValueNoEvent(ClickGuiModule.ColorPreset.CUSTOM);
+        setColor(green);
     }
 
     public Color getColor() {

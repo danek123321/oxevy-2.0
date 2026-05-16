@@ -10,6 +10,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.Camera;
 
 import java.awt.Color;
 
@@ -31,6 +32,7 @@ public class TracerModule extends Module {
         if (mc.level == null || mc.player == null) return;
 
         Vec3 camera = mc.gameRenderer.getMainCamera().position();
+        Vec3 from = RenderUtil.getTracerOrigin();
         for (Entity entity : mc.level.entitiesForRendering()) {
             if (entity == mc.player) continue;
 
@@ -39,7 +41,6 @@ public class TracerModule extends Module {
             if (dist > maxDistance.getValue()) continue;
 
             Color color = getColor(entity);
-            Vec3 from = mc.player.getEyePosition(event.getDelta());
             Vec3 to = entity.position().add(0, entity.getBbHeight() * 0.5, 0);
 
             RenderUtil.drawLine(event.getMatrix(), from, to, color, lineWidth.getValue(), throughWalls.getValue());

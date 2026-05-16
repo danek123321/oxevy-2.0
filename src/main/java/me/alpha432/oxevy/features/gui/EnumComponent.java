@@ -1,45 +1,35 @@
 package me.alpha432.oxevy.features.gui;
 
+import me.alpha432.oxevy.features.modules.client.ClickGuiModule;
 import me.alpha432.oxevy.features.settings.Setting;
 import me.alpha432.oxevy.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 
+import java.awt.Color;
+
 public class EnumComponent extends SettingComponent {
     private static final Minecraft mc = Minecraft.getInstance();
-    
     public EnumComponent(Setting<?> setting, int x, int y, int width, int height) {
         super(setting, x, y, width, height);
     }
-    
     @Override
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        boolean hovered = isHovered(mouseX, mouseY);
-        
-        // Background
-        RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        
-        // Label
-        context.drawString(mc.font, setting.getName(), x + 5, y + (height - 8) / 2, 0xFFBBBBBB);
-        
-        // Value
-        String valueText = setting.currentEnumName();
-        context.drawString(mc.font, valueText, x + width - 5 - mc.font.width(valueText), y + (height - 8) / 2, 0xFFFFFFFF);
-        
-        if (hovered) {
-            RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        }
+        Color accent = ClickGuiModule.getInstance().color.getValue();
+        RenderUtil.roundRect(context, x, y, width, height, 8f, isHovered(mouseX, mouseY) ? 0x1AFFFFFF : 0x12FFFFFF);
+        int textY = y + (height - 8) / 2;
+        context.drawString(mc.font, setting.getName(), x + 10, textY, 0xFFE6E6E6);
+        String val = setting.currentEnumName();
+        context.drawString(mc.font, val, x + width - 20 - mc.font.width(val), textY, new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 230).getRGB());
+        context.drawString(mc.font, ">", x + width - 12, textY, 0xFF9E9EAA);
     }
-    
     @Override
-    public void mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY)) {
-            if (button == 0) {
-                setting.increaseEnum();
-            } else if (button == 1) {
-                setting.reset();
-            }
+    public boolean mouseClicked(double mx, double my, int b) {
+        if (isHovered(mx, my)) {
+            if (b == 0) setting.increaseEnum();
+            else if (b == 1) setting.reset();
+            return true;
         }
+        return false;
     }
 }
-

@@ -6,3 +6,5 @@ accessible method net/minecraft/network/protocol/game/ServerboundInteractPacket$
 accessible class net/minecraft/network/protocol/game/ServerboundInteractPacket$ActionType
 accessible field net/minecraft/network/protocol/game/ServerboundInteractPacket action Lnet/minecraft/network/protocol/game/ServerboundInteractPacket$Action;
 accessible method net/minecraft/client/multiplayer/MultiPlayerGameMode ensureHasSentCarriedItem ()V
+accessible field net/minecraft/world/entity/Entity stuckSpeedMultiplier Lnet/minecraft/world/phys/Vec3;
+accessible method net/minecraft/world/entity/projectile/FishingHook calculateOpenWater (Lnet/minecraft/core/BlockPos;)Z

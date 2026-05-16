@@ -2,52 +2,36 @@ package me.alpha432.oxevy.features.modules.hud;
 
 import me.alpha432.oxevy.event.impl.render.Render2DEvent;
 import me.alpha432.oxevy.features.modules.Module;
-import me.alpha432.oxevy.features.settings.Setting;
-import me.alpha432.oxevy.util.render.RenderUtil;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
-import java.io.File;
-
 public class MenuWatermark extends Module {
-    public Setting<Integer> red = num("Red", 255, 0, 255);
-    public Setting<Integer> green = num("Green", 255, 0, 255);
-    public Setting<Integer> blue = num("Blue", 255, 0, 255);
-    public Setting<Integer> alpha = num("Alpha", 255, 0, 255);
-
-    private Identifier watermarkId = null;
+    private static final Identifier WATERMARK_TEX = Identifier.fromNamespaceAndPath("oxevy", "textures/watermark.png");
 
     public MenuWatermark() {
         super("MenuWatermark", "Shows watermark on main menu", Category.HUD);
-    }
-
-    private void ensureWatermarkLoaded() {
-        if (watermarkId != null) return;
-        watermarkId = RenderUtil.loadTexture(new File("images/watermark.png"), "oxevy/menu_watermark");
     }
 
     @Override
     public void onRender2D(Render2DEvent event) {
         if (!(mc.screen instanceof TitleScreen)) return;
 
-        ensureWatermarkLoaded();
-
-        int color = (alpha.getValue() << 24) | (red.getValue() << 16) | (green.getValue() << 8) | blue.getValue();
-        
+        GuiGraphics ctx = event.getContext();
         float screenWidth = mc.getWindow().getGuiScaledWidth();
-        
-        String text = "oxevy";
-        int textWidth = mc.font.width(text);
-        int imgSize = mc.font.lineHeight * 4;
+        float screenHeight = mc.getWindow().getGuiScaledHeight();
 
-        float x = screenWidth - textWidth - imgSize - 20;
-        float y = 10;
+        float scale = 0.35f;
+        int w = (int) (800 * scale);
+        int h = (int) (400 * scale);
+        int x = (int) ((screenWidth - w) / 2);
+        int y = (int) (screenHeight / 4 - h / 2);
 
-        if (watermarkId != null) {
-            event.getContext().blit(net.minecraft.client.renderer.RenderPipelines.GUI, watermarkId, (int) x, (int) y, imgSize, imgSize, 0, 0, imgSize, imgSize, imgSize, imgSize);
-            x += imgSize + 5;
-        }
-        
-        event.getContext().drawString(mc.font, text, (int) x, (int) y + (imgSize - mc.font.lineHeight) / 2, color);
+        ctx.pose().pushMatrix();
+        ctx.pose().translate(x, y);
+        ctx.pose().scale(scale, scale);
+        ctx.blit(RenderPipelines.GUI_TEXTURED, WATERMARK_TEX, 0, 0, 0f, 0f, 800, 400, 800, 400);
+        ctx.pose().popMatrix();
     }
 }

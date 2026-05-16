@@ -14,8 +14,16 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
+import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import com.mojang.blaze3d.platform.NativeImage;
 
 import java.awt.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +32,7 @@ import java.util.List;
  * Reduces GPU draw calls by batching similar operations.
  *
  * @author Oxevy Team
- * @version 2.0
+ * @version 2.1
  */
 public class RenderUtil implements Util {
 
@@ -54,6 +62,84 @@ public class RenderUtil implements Util {
      */
     public static void invalidateCameraCache() {
         lastCameraUpdateNanos = 0;
+    }
+    public static Vec3 getTracerOrigin() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.gameRenderer == null || mc.gameRenderer.getMainCamera() == null) {
+            return Vec3.ZERO;
+        }
+        Camera camera = mc.gameRenderer.getMainCamera();
+        Vec3 pos = camera.position();
+        
+        float yaw = camera.yRot();
+        float pitch = camera.xRot();
+        
+        float radPerDeg = (float)Math.PI / 180f;
+        float pi = (float)Math.PI;
+        
+        float adjustedYaw = -yaw * radPerDeg - pi;
+        float cosYaw = (float)Math.cos(adjustedYaw);
+        float sinYaw = (float)Math.sin(adjustedYaw);
+        
+        float adjustedPitch = -pitch * radPerDeg;
+        float nCosPitch = -(float)Math.cos(adjustedPitch);
+        float sinPitch = (float)Math.sin(adjustedPitch);
+        
+        Vec3 look = new Vec3(sinYaw * nCosPitch, sinPitch, cosYaw * nCosPitch);
+        
+        return new Vec3(pos.x + look.x * 10, pos.y + look.y * 10, pos.z + look.z * 10);
+    }
+
+
+    public static Identifier loadTexture(File file, String name) {
+        try (FileInputStream fis = new FileInputStream(file)) {
+            NativeImage image = NativeImage.read(fis);
+            DynamicTexture texture = new DynamicTexture(() -> name, image);
+            texture.upload();
+            Identifier location = Identifier.fromNamespaceAndPath("oxevy", name.toLowerCase().replace(" ", "_"));
+            Minecraft.getInstance().getTextureManager().register(location, texture);
+            return location;
+        } catch (Exception e) {
+            me.alpha432.oxevy.Oxevy.LOGGER.error("Failed to load texture from {}", file.getPath(), e);
+            return null;
+        }
+    }
+
+    public static Identifier loadTextureFromResources(Identifier resourceId, String registryName) {
+        try {
+            var resource = Minecraft.getInstance().getResourceManager().getResource(resourceId).orElse(null);
+            if (resource == null) {
+                me.alpha432.oxevy.Oxevy.LOGGER.error("Resource not found: {}", resourceId);
+                return null;
+            }
+            NativeImage image = NativeImage.read(resource.open());
+            DynamicTexture texture = new DynamicTexture(() -> registryName, image);
+            texture.upload();
+            Identifier location = Identifier.fromNamespaceAndPath("oxevy", registryName.toLowerCase().replace(" ", "_"));
+            Minecraft.getInstance().getTextureManager().register(location, texture);
+            return location;
+        } catch (Exception e) {
+            me.alpha432.oxevy.Oxevy.LOGGER.error("Failed to load texture from resources: {}", resourceId, e);
+            return null;
+        }
+    }
+
+    public static Identifier loadTextureFromUrl(String url, String registryName) {
+        try {
+            URLConnection conn = new URL(url).openConnection();
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            try (InputStream is = conn.getInputStream()) {
+                NativeImage image = NativeImage.read(is);
+                DynamicTexture texture = new DynamicTexture(() -> registryName, image);
+                texture.upload();
+                Identifier location = Identifier.fromNamespaceAndPath("oxevy", registryName.toLowerCase().replace(" ", "_"));
+                Minecraft.getInstance().getTextureManager().register(location, texture);
+                return location;
+            }
+        } catch (Exception e) {
+            me.alpha432.oxevy.Oxevy.LOGGER.error("Failed to load texture from {}", url, e);
+            return null;
+        }
     }
 
     // Helper methods for 3D rendering
@@ -116,58 +202,10 @@ public class RenderUtil implements Util {
         Layers.quads().draw(bufferBuilder.buildOrThrow());
     }
 
-    /**
-     * Alias for rectFilled - draws a filled 3D box.
-     * Backward compatible method name.
-     */
     public static void drawBoxFilled(PoseStack stack, AABB box, Color c) {
-        Vec3 camera = getCameraPos();
-        float minX = (float) (box.minX - camera.x);
-        float minY = (float) (box.minY - camera.y);
-        float minZ = (float) (box.minZ - camera.z);
-        float maxX = (float) (box.maxX - camera.x);
-        float maxY = (float) (box.maxY - camera.y);
-        float maxZ = (float) (box.maxZ - camera.z);
-
-        BufferBuilder bufferBuilder = Tesselator.getInstance()
-                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        PoseStack.Pose pose = stack.last();
-        int color = c.getRGB();
-
-        bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, minY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, minY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, minX, minY, maxZ).setColor(color);
-
-        bufferBuilder.addVertex(pose, minX, maxY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, minX, maxY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, maxY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, maxY, minZ).setColor(color);
-
-        bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, minX, maxY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, maxY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, minY, minZ).setColor(color);
-
-        bufferBuilder.addVertex(pose, maxX, minY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, maxY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, maxY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, minY, maxZ).setColor(color);
-
-        bufferBuilder.addVertex(pose, minX, minY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, minY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, maxX, maxY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, minX, maxY, maxZ).setColor(color);
-
-        bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color);
-        bufferBuilder.addVertex(pose, minX, minY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, minX, maxY, maxZ).setColor(color);
-        bufferBuilder.addVertex(pose, minX, maxY, minZ).setColor(color);
-
-        Layers.quads().draw(bufferBuilder.buildOrThrow());
+        drawBoxFilled(stack, box, c.getRGB());
     }
 
-    // 2D Rendering with optimized GuiGraphics
     public static void rect(GuiGraphics context, float x1, float y1, float x2, float y2, int color) {
         int ix1 = Math.round(x1);
         int iy1 = Math.round(y1);
@@ -185,15 +223,10 @@ public class RenderUtil implements Util {
     }
 
     public static void roundRect(GuiGraphics context, float x, float y, float w, float h, float radius, int color) {
-        // Simple approximation using 5 rects for now, or just use the fill method if we want it simple.
-        // For a "rich" feel, we can use a custom shader or many small rects, 
-        // but GuiGraphics doesn't easily support rounded rects out of the box without complex buffer manipulation.
-        // Let's use a 9-slice or just filled rects for now but make it look good.
         context.fill((int) (x + radius), (int) y, (int) (x + w - radius), (int) (y + h), color);
         context.fill((int) x, (int) (y + radius), (int) (x + radius), (int) (y + h - radius), color);
         context.fill((int) (x + w - radius), (int) (y + radius), (int) (x + w), (int) (y + h - radius), color);
         
-        // Corners (simplified as squares for now, can be improved)
         context.fill((int) x, (int) y, (int) (x + radius), (int) (y + radius), color);
         context.fill((int) (x + w - radius), (int) y, (int) (x + w), (int) (y + radius), color);
         context.fill((int) x, (int) (y + h - radius), (int) (x + radius), (int) (y + h), color);
@@ -233,7 +266,6 @@ public class RenderUtil implements Util {
         ));
     }
 
-    // 3D Rendering with camera caching
     public static void rect(PoseStack stack, float x1, float y1, float x2, float y2, int color) {
         rectFilled(stack, x1, y1, x2, y2, color);
     }
@@ -245,12 +277,19 @@ public class RenderUtil implements Util {
         drawVerticalLine(stack, x1, y1, y2, color, width);
     }
 
-    // 3D Box rendering (optimized)
+    public static void drawBox(PoseStack stack, BlockPos pos, Color color, float width) {
+        drawBox(stack, new AABB(pos), color, width, true);
+    }
+
     public static void drawBox(PoseStack stack, AABB box, Color c, float lineWidth) {
         drawBox(stack, box, c, lineWidth, true);
     }
 
     public static void drawBox(PoseStack stack, AABB box, Color c, float lineWidth, boolean throughWalls) {
+        drawBox(stack, box, c.getRGB(), lineWidth, throughWalls);
+    }
+
+    public static void drawBox(PoseStack stack, AABB box, int color, float lineWidth, boolean throughWalls) {
         Vec3 camera = getCameraPos();
         float minX = (float) (box.minX - camera.x);
         float minY = (float) (box.minY - camera.y);
@@ -262,9 +301,7 @@ public class RenderUtil implements Util {
         BufferBuilder bufferBuilder = Tesselator.getInstance()
                 .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
         PoseStack.Pose pose = stack.last();
-        int color = c.getRGB();
 
-        // Batch all line vertices in a single buffer
         bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color).setLineWidth(lineWidth);
         bufferBuilder.addVertex(pose, maxX, minY, minZ).setColor(color).setLineWidth(lineWidth);
         bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color).setLineWidth(lineWidth);
@@ -293,116 +330,186 @@ public class RenderUtil implements Util {
         (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
     }
 
-    public static void drawBox(PoseStack stack, Vec3 vec, Color c, float lineWidth) {
-        drawBox(stack, AABB.unitCubeFromLowerCorner(vec), c, lineWidth);
+    public static void drawOutlinedBoxes(PoseStack stack, List<AABB> boxes, int color, boolean throughWalls) {
+        drawOutlinedBoxes(stack, boxes, color, throughWalls, 1.5f);
     }
 
-    public static void drawBox(PoseStack stack, BlockPos bp, Color c, float lineWidth) {
-        drawBox(stack, new AABB(bp), c, lineWidth);
+    public static void drawOutlinedBoxes(PoseStack stack, List<AABB> boxes, int color, boolean throughWalls, float lineWidth) {
+        for (AABB box : boxes) {
+            drawBox(stack, box, color, lineWidth, throughWalls);
+        }
     }
 
-    // 3D Line drawing with camera caching
-    public static void drawLine(PoseStack stack, Vec3 from, Vec3 to, Color c, float lineWidth, boolean throughWalls) {
+    public static void drawSolidBoxes(PoseStack stack, List<AABB> boxes, int color, boolean throughWalls) {
+        for (AABB box : boxes) {
+            drawBoxFilled(stack, box, color);
+        }
+    }
+
+    public static void drawBoxFilled(PoseStack stack, AABB box, int color) {
         Vec3 camera = getCameraPos();
-        float x1 = (float) (from.x - camera.x);
-        float y1 = (float) (from.y - camera.y);
-        float z1 = (float) (from.z - camera.z);
-        float x2 = (float) (to.x - camera.x);
-        float y2 = (float) (to.y - camera.y);
-        float z2 = (float) (to.z - camera.z);
+        float minX = (float) (box.minX - camera.x);
+        float minY = (float) (box.minY - camera.y);
+        float minZ = (float) (box.minZ - camera.z);
+        float maxX = (float) (box.maxX - camera.x);
+        float maxY = (float) (box.maxY - camera.y);
+        float maxZ = (float) (box.maxZ - camera.z);
+
+        BufferBuilder bufferBuilder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        PoseStack.Pose pose = stack.last();
+
+        bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, minY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, minY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, minX, minY, maxZ).setColor(color);
+
+        bufferBuilder.addVertex(pose, minX, maxY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, minX, maxY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, maxY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, maxY, minZ).setColor(color);
+
+        bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, minX, maxY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, maxY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, minY, minZ).setColor(color);
+
+        bufferBuilder.addVertex(pose, maxX, minY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, maxY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, maxY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, minY, maxZ).setColor(color);
+
+        bufferBuilder.addVertex(pose, minX, minY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, minY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, maxX, maxY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, minX, maxY, maxZ).setColor(color);
+
+        bufferBuilder.addVertex(pose, minX, minY, minZ).setColor(color);
+        bufferBuilder.addVertex(pose, minX, minY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, minX, maxY, maxZ).setColor(color);
+        bufferBuilder.addVertex(pose, minX, maxY, minZ).setColor(color);
+
+        Layers.quads().draw(bufferBuilder.buildOrThrow());
+    }
+
+    public static void drawLine(PoseStack stack, Vec3 start, Vec3 end, Color color, float width, boolean throughWalls) {
+        Vec3 camera = getCameraPos();
+        float x1 = (float) (start.x - camera.x);
+        float y1 = (float) (start.y - camera.y);
+        float z1 = (float) (start.z - camera.z);
+        float x2 = (float) (end.x - camera.x);
+        float y2 = (float) (end.y - camera.y);
+        float z2 = (float) (end.z - camera.z);
 
         BufferBuilder bufferBuilder = Tesselator.getInstance()
                 .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
         PoseStack.Pose pose = stack.last();
-        int color = c.getRGB();
-        bufferBuilder.addVertex(pose, x1, y1, z1).setColor(color).setLineWidth(lineWidth);
-        bufferBuilder.addVertex(pose, x2, y2, z2).setColor(color).setLineWidth(lineWidth);
+        int c = color.getRGB();
+
+        bufferBuilder.addVertex(pose, x1, y1, z1).setColor(c).setLineWidth(width);
+        bufferBuilder.addVertex(pose, x2, y2, z2).setColor(c).setLineWidth(width);
 
         (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
     }
 
-    public static void drawLine(PoseStack stack, Vec3 from, Vec3 to, Color cFrom, Color cTo, float lineWidth, boolean throughWalls) {
+    public static void drawCircle(PoseStack stack, Vec3 center, float radius, int segments, Color color, float width, boolean throughWalls) {
         Vec3 camera = getCameraPos();
-        float x1 = (float) (from.x - camera.x);
-        float y1 = (float) (from.y - camera.y);
-        float z1 = (float) (from.z - camera.z);
-        float x2 = (float) (to.x - camera.x);
-        float y2 = (float) (to.y - camera.y);
-        float z2 = (float) (to.z - camera.z);
-
-        BufferBuilder bufferBuilder = Tesselator.getInstance()
-                .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
-        PoseStack.Pose pose = stack.last();
-        bufferBuilder.addVertex(pose, x1, y1, z1).setColor(cFrom.getRGB()).setLineWidth(lineWidth);
-        bufferBuilder.addVertex(pose, x2, y2, z2).setColor(cTo.getRGB()).setLineWidth(lineWidth);
-
-        (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
-    }
-
-    // Rest of the file (optimized methods continue with camera caching)
-    public static void drawCircle(PoseStack stack, Vec3 center, float radius, int segments, Color c, float lineWidth, boolean throughWalls) {
-        Vec3 camera = getCameraPos();
-        Vec3 toCenter = center.subtract(camera).normalize();
-        Vec3 right = Math.abs(toCenter.y) < 0.999 ? new Vec3(0, 1, 0).cross(toCenter).normalize() : new Vec3(1, 0, 0);
-        Vec3 up = toCenter.cross(right).normalize();
-        BufferBuilder bufferBuilder = Tesselator.getInstance()
-                .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
-        PoseStack.Pose pose = stack.last();
-        int color = c.getRGB();
         float cx = (float) (center.x - camera.x);
         float cy = (float) (center.y - camera.y);
         float cz = (float) (center.z - camera.z);
+
+        BufferBuilder bufferBuilder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
+        PoseStack.Pose pose = stack.last();
+        int c = color.getRGB();
+
         for (int i = 0; i < segments; i++) {
-            float a1 = (float) (2 * Math.PI * i / segments);
-            float a2 = (float) (2 * Math.PI * (i + 1) / segments);
-            float r1 = radius * (float) Math.cos(a1);
-            float u1 = radius * (float) Math.sin(a1);
-            float r2 = radius * (float) Math.cos(a2);
-            float u2 = radius * (float) Math.sin(a2);
-            float px1 = cx + (float) right.x * r1 + (float) up.x * u1;
-            float py1 = cy + (float) right.y * r1 + (float) up.y * u1;
-            float pz1 = cz + (float) right.z * r1 + (float) up.z * u1;
-            float px2 = cx + (float) right.x * r2 + (float) up.x * u2;
-            float py2 = cy + (float) right.y * r2 + (float) up.y * u2;
-            float pz2 = cz + (float) right.z * r2 + (float) up.z * u2;
-            bufferBuilder.addVertex(pose, px1, py1, pz1).setColor(color).setLineWidth(lineWidth);
-            bufferBuilder.addVertex(pose, px2, py2, pz2).setColor(color).setLineWidth(lineWidth);
+            float angle = (float) (i * 2 * Math.PI / segments);
+            float nextAngle = (float) ((i + 1) * 2 * Math.PI / segments);
+            float x1 = cx + (float) Math.cos(angle) * radius;
+            float z1 = cz + (float) Math.sin(angle) * radius;
+            float x2 = cx + (float) Math.cos(nextAngle) * radius;
+            float z2 = cz + (float) Math.sin(nextAngle) * radius;
+
+            bufferBuilder.addVertex(pose, x1, cy, z1).setColor(c).setLineWidth(width);
+            bufferBuilder.addVertex(pose, x2, cy, z2).setColor(c).setLineWidth(width);
+        }
+
+        (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
+    }
+
+    public static void drawCurvedLine(PoseStack stack, List<Vec3> points, int color, float lineWidth, boolean throughWalls) {
+        if (points.size() < 2) return;
+        Vec3 camera = getCameraPos();
+
+        BufferBuilder bufferBuilder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
+        PoseStack.Pose pose = stack.last();
+
+        for (int i = 1; i < points.size(); i++) {
+            Vec3 prev = points.get(i - 1);
+            Vec3 curr = points.get(i);
+            float x1 = (float) (prev.x - camera.x);
+            float y1 = (float) (prev.y - camera.y);
+            float z1 = (float) (prev.z - camera.z);
+            float x2 = (float) (curr.x - camera.x);
+            float y2 = (float) (curr.y - camera.y);
+            float z2 = (float) (curr.z - camera.z);
+
+            bufferBuilder.addVertex(pose, x1, y1, z1).setColor(color).setLineWidth(lineWidth);
+            bufferBuilder.addVertex(pose, x2, y2, z2).setColor(color).setLineWidth(lineWidth);
+        }
+
+        (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
+    }
+
+    public static void drawTracers(PoseStack stack, float delta, List<Vec3> ends, int color, float lineWidth, boolean throughWalls) {
+        if (ends.isEmpty()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        Vec3 camera = getCameraPos();
+        Vec3 start = getTracerOrigin();
+
+        BufferBuilder bufferBuilder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
+        PoseStack.Pose pose = stack.last();
+
+        for (Vec3 end : ends) {
+            float sx = (float) (start.x - camera.x);
+            float sy = (float) (start.y - camera.y);
+            float sz = (float) (start.z - camera.z);
+            float ex = (float) (end.x - camera.x);
+            float ey = (float) (end.y - camera.y);
+            float ez = (float) (end.z - camera.z);
+
+            bufferBuilder.addVertex(pose, sx, sy, sz).setColor(color).setLineWidth(lineWidth);
+            bufferBuilder.addVertex(pose, ex, ey, ez).setColor(color).setLineWidth(lineWidth);
         }
         (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
     }
 
-    /**
-     * Loads a local image file into a Minecraft texture using reflection.
-     * @param f The image file to load.
-     * @param name The name to register the dynamic texture under.
-     * @return The Identifier of the loaded texture, or null if failed.
-     */
-    public static net.minecraft.resources.Identifier loadTexture(java.io.File f, String name) {
-        if (!f.exists()) return null;
-        try (java.io.InputStream fis = new java.io.FileInputStream(f)) {
-            // Use reflection to avoid compile-time dependency on mappings if they are tricky
-            Class<?> nativeImageClass = Class.forName("net.minecraft.client.texture.NativeImage");
-            java.lang.reflect.Method read = nativeImageClass.getMethod("read", java.io.InputStream.class);
-            Object img = read.invoke(null, fis);
+    public static void drawTracersToPoints(PoseStack stack, float delta, Vec3 start, List<Vec3> ends, List<Integer> colors, float lineWidth, boolean throughWalls) {
+        if (ends.isEmpty()) return;
+        Vec3 camera = getCameraPos();
 
-            Class<?> nativeTexClass = Class.forName("net.minecraft.client.texture.NativeImageBackedTexture");
-            java.lang.reflect.Constructor<?> texCtor = nativeTexClass.getConstructor(nativeImageClass);
-            Object tex = texCtor.newInstance(img);
+        BufferBuilder bufferBuilder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH);
+        PoseStack.Pose pose = stack.last();
 
-            Object textureManager = Minecraft.getInstance().getTextureManager();
-            java.lang.reflect.Method registerMethod = textureManager.getClass().getMethod("registerDynamicTexture", String.class, nativeTexClass);
-            return (net.minecraft.resources.Identifier) registerMethod.invoke(textureManager, name, tex);
-        } catch (Throwable ignored) {
-            return null;
+        float sx = (float) (start.x - camera.x);
+        float sy = (float) (start.y - camera.y);
+        float sz = (float) (start.z - camera.z);
+
+        for (int i = 0; i < ends.size(); i++) {
+            Vec3 end = ends.get(i);
+            int color = i < colors.size() ? colors.get(i) : 0x80FFFFFF;
+            float ex = (float) (end.x - camera.x);
+            float ey = (float) (end.y - camera.y);
+            float ez = (float) (end.z - camera.z);
+
+            bufferBuilder.addVertex(pose, sx, sy, sz).setColor(color).setLineWidth(lineWidth);
+            bufferBuilder.addVertex(pose, ex, ey, ez).setColor(color).setLineWidth(lineWidth);
         }
-    }
-
-    public static PoseStack matrixFrom(Vec3 pos) {
-        PoseStack matrices = new PoseStack();
-        Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-        matrices.mulPose(Axis.XP.rotationDegrees(camera.xRot()));
-        matrices.mulPose(Axis.YP.rotationDegrees(camera.yRot() + 180.0F));
-        matrices.translate(pos.x() - camera.position().x, pos.y() - camera.position().y, pos.z() - camera.position().z);
-        return matrices;
+        (throughWalls ? Layers.lines() : Layers.linesDepth()).draw(bufferBuilder.buildOrThrow());
     }
 }

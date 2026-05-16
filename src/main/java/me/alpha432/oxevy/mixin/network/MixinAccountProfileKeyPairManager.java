@@ -1,13 +1,11 @@
 package me.alpha432.oxevy.mixin.network;
 
+import com.mojang.authlib.exceptions.MinecraftClientException;
+import com.mojang.authlib.minecraft.UserApiService;
+import com.mojang.authlib.yggdrasil.response.KeyPairResponse;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
  * Silences Mojang keypair retrieval spam when the session is unauthorized (401).
@@ -16,36 +14,26 @@ import java.util.concurrent.CompletionException;
 @Mixin(net.minecraft.client.multiplayer.AccountProfileKeyPairManager.class)
 public class MixinAccountProfileKeyPairManager {
 
-    @Inject(method = "fetchProfileKeyPair", at = @At("RETURN"), cancellable = true)
-    private void oxevy$swallowUnauthorizedKeyPairFetch(CallbackInfoReturnable<CompletableFuture<Optional<?>>> cir) {
-        CompletableFuture<Optional<?>> original = cir.getReturnValue();
-        if (original == null) return;
-
-        cir.setReturnValue(original.exceptionally(t -> {
-            Throwable root = unwrap(t);
-            if (isUnauthorized401(root)) {
-                return Optional.empty();
-            }
-            throw new CompletionException(root);
-        }));
-    }
-
-    private static Throwable unwrap(Throwable t) {
-        Throwable cur = t;
-        while (cur instanceof CompletionException && cur.getCause() != null) {
-            cur = cur.getCause();
+    @Redirect(
+        method = "fetchProfileKeyPair",
+        at = @At(
+            value = "INVOKE",
+            target = "Lcom/mojang/authlib/minecraft/UserApiService;getKeyPair()Lcom/mojang/authlib/yggdrasil/response/KeyPairResponse;"
+        )
+    )
+    private KeyPairResponse oxevy$swallowUnauthorizedKeyPairFetch(UserApiService service) {
+        try {
+            return service.getKeyPair();
+        } catch (MinecraftClientException e) {
+            if (isUnauthorized401(e)) return null;
+            throw e;
         }
-        return cur;
     }
 
     private static boolean isUnauthorized401(Throwable t) {
         for (Throwable cur = t; cur != null; cur = cur.getCause()) {
-            String s = cur.toString();
-            if (s != null && s.contains("Status: 401")) {
-                return true;
-            }
+            if (cur.toString().contains("Status: 401")) return true;
         }
         return false;
     }
 }
-

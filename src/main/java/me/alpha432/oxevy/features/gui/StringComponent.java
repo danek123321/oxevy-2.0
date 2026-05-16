@@ -20,7 +20,6 @@ public class StringComponent extends SettingComponent {
         // Background
         RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
         
-        // Label
         context.drawString(mc.font, setting.getName(), x + 5, y + 2, 0xFFBBBBBB);
         
         // Input box background
@@ -40,12 +39,14 @@ public class StringComponent extends SettingComponent {
     }
     
     @Override
-    public void mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (isHovered(mouseX, mouseY)) {
             focused = true;
+            return true;
         } else {
             focused = false;
         }
+        return false;
     }
     
     public boolean isFocused() {
@@ -56,4 +57,3 @@ public class StringComponent extends SettingComponent {
         this.focused = focused;
     }
 }
-

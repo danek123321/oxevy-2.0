@@ -18,17 +18,9 @@ public abstract class MixinTitleScreen extends net.minecraft.client.gui.screens.
         super(title);
     }
 
-    @Inject(method = "init", at = @At("TAIL"))
+    @Inject(method = "init", at = @At("HEAD"), cancellable = true)
     private void onInit(CallbackInfo ci) {
-        this.addRenderableWidget(Button.builder(
-            Component.literal("ClickGUI"),
-            (btn) -> {
-                Minecraft mc = Minecraft.getInstance();
-                if (mc.player != null) {
-                    mc.player.closeContainer();
-                }
-                OxevySettingsScreen.open();
-            }
-        ).bounds(this.width / 2 - 100, this.height - 28, 200, 20).build());
+        Minecraft.getInstance().setScreen(new me.alpha432.oxevy.features.gui.LiquidMainMenu());
+        ci.cancel();
     }
 }

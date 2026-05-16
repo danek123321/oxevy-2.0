@@ -3,6 +3,7 @@ import java.nio.file.Paths
 plugins {
     id 'fabric-loom' version "$loom_version"
     id 'com.github.gmazzo.buildconfig' version "$buildconfig_version"
+    id 'org.jetbrains.kotlin.jvm' version "$kotlin_version"
 }
 
 var USING_GIT = Paths.get(System.getProperty("user.dir")).resolve(".git").toFile().exists()
@@ -26,6 +27,7 @@ buildConfig {
 }
 
 sourceSets.main.java.srcDirs += "build/gen/buildconfig/src/main"
+sourceSets.main.kotlin.srcDirs += "src/main/kotlin"
 
 base {
     archivesName = "${project.archives_base_name}-${GIT_HASH}"
@@ -33,9 +35,8 @@ base {
 
 repositories {
     mavenCentral()
-    maven {
-        url = uri("https://jitpack.io")
-    }
+    maven { url = uri("https://maven.wispforest.io/releases/") }
+    maven { url = uri("https://jitpack.io") }
 }
 
 loom {
@@ -52,11 +53,17 @@ dependencies {
 
     include implementation("com.github.cattyngmd.catformat:catformat-core:${project.catformat_version}")
     include modImplementation("com.github.cattyngmd.catformat:catformat-fabric:${project.catformat_version}")
+
+    // Fabric Language Kotlin - include runtime
+    modImplementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
+    include("net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}")
+    
+    // Explicitly include kotlin runtime
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
+    
 }
 
 processResources {
-    // Capture project values at configuration time. Referencing `project` from the copy action
-    // (e.g., inside `filesMatching { ... }`) is deprecated and will error in Gradle 10.
     def modVersion = project.version
     def minecraftVersion = project.minecraft_version
     def loaderVersion = project.loader_version
@@ -81,13 +88,22 @@ tasks.withType(JavaCompile).configureEach {
     }
 }
 
+kotlin {
+    jvmToolchain(targetJavaVersion)
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "${targetJavaVersion}"
+        freeCompilerArgs += ["-Xjvm-default=all"]
+    }
+}
+
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     if (JavaVersion.current() < javaVersion) {
         toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
     }
-
-    // (was: archivesBaseName = project.archives_base_name)
     withSourcesJar()
 }
 
@@ -102,6 +118,10 @@ jar {
 }
 
 tasks.withType(JavaCompile).configureEach {
+    dependsOn(generateBuildConfig)
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
     dependsOn(generateBuildConfig)
 }
 

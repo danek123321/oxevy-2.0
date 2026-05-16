@@ -19,6 +19,16 @@ class Pipelines {
             .withCull(false)
             .build();
 
+    /** Quads with depth test: hidden behind walls. */
+    static final RenderPipeline GLOBAL_QUADS_DEPTH_PIPELINE = RenderPipeline.builder(DEBUG_FILLED_SNIPPET)
+            .withLocation("pipeline/global_fill_depth_pipeline")
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+            .withBlend(BlendFunction.TRANSLUCENT)
+            .withDepthWrite(false)
+            .withCull(false)
+            .build();
+
     static final RenderPipeline GLOBAL_LINES_PIPELINE = RenderPipeline.builder(LINES_SNIPPET)
             .withLocation("pipeline/global_lines_pipeline")
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH, VertexFormat.Mode.LINES)

@@ -13,6 +13,7 @@
     "repo": "https://github.com/mioclient/oxevy"
   },
   "license": "MIT",
+  "icon": "assets/oxevy/textures/watermark.png",
   "environment": "client",
   "accessWidener": "oxevy.accesswidener",
   "entrypoints": {

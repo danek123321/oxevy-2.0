@@ -187,8 +187,12 @@ public class Module extends Feature implements Jsonable, Toggleable {
             }
         }
         if (object.has("Enabled")) {
-            String enabled = object.get("Enabled").getAsString();
-            if (Boolean.parseBoolean(enabled)) toggle();
+            boolean shouldBeEnabled = Boolean.parseBoolean(object.get("Enabled").getAsString());
+            if (shouldBeEnabled && !isEnabled()) {
+                enable();
+            } else if (!shouldBeEnabled && isEnabled()) {
+                disable();
+            }
         }
         for (Setting<?> setting : getSettings()) {
             try {

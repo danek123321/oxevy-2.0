@@ -10,177 +10,123 @@ import java.awt.*;
 
 public class ColorComponent extends SettingComponent {
     private static final Minecraft mc = Minecraft.getInstance();
-    private static final int PICKER_HEIGHT = 80;
-    
-    private boolean pickerOpen = false;
-    private float[] hsb;
-    private int dragX = -1, dragY = -1;
-    private boolean dragging = false;
-    private boolean draggingAlpha = false;
-    private int pickerOffsetY = 0;
-    
+    private static final String[] CHANNEL_NAMES = {"Red", "Green", "Blue", "Alpha"};
+    private static final Color[] CHANNEL_COLORS = {
+            new Color(255, 90, 90),
+            new Color(90, 255, 150),
+            new Color(90, 170, 255),
+            new Color(225, 225, 225)
+    };
+
+    private boolean open = false;
+    private int draggingChannel = -1;
     public ColorComponent(Setting<Color> setting, int x, int y, int width, int height) {
         super(setting, x, y, width, height);
-        Color c = (Color) setting.getValue();
-        hsb = Color.RGBtoHSB(c.getRed(), c.getGreen(), c.getBlue(), null);
     }
-    
     @Override
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        Color value = (Color) setting.getValue();
-        boolean hovered = isHovered(mouseX, mouseY);
-        
-        RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        
-        context.drawString(mc.font, setting.getName(), x + 5, y + (height - 8) / 2, 0xFFBBBBBB);
-        
-        RenderUtil.rect(context, x + width - 25, y + 3, x + width - 5, y + height - 3, value.getRGB());
-        
-        if (hovered) {
-            RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        }
-        
-        if (pickerOpen) {
-            renderPicker(context, mouseX, mouseY);
-        }
-    }
-    
-    private void renderPicker(GuiGraphics context, int mouseX, int mouseY) {
-        int pickerWidth = width - 10;
-        int pickerX = x + 5;
-        int pickerY = y + height + 2;
-        
-        pickerOffsetY = pickerY;
-        
-        Color currentColor = (Color) setting.getValue();
-        Color realColor = Color.getHSBColor(hsb[0], 1, 1);
-        
-        RenderUtil.horizontalGradient(context, pickerX, pickerY, pickerX + pickerWidth, pickerY + pickerWidth,
-            Color.WHITE, realColor);
-        RenderUtil.verticalGradient(context, pickerX, pickerY, pickerX + pickerWidth, pickerY + pickerWidth,
-            new Color(0, 0, 0, 0), Color.BLACK);
-        
-        int sat = (int) (hsb[1] * pickerWidth);
-        int bri = (int) ((1 - hsb[2]) * pickerWidth);
-        sat = Math.max(0, Math.min(pickerWidth - 1, sat));
-        bri = Math.max(0, Math.min(pickerWidth - 1, bri));
-        
-        RenderUtil.rect(context, pickerX + sat - 2, pickerY + bri - 2, pickerX + sat + 2, pickerY + bri + 2, Color.BLACK.getRGB());
-        
-        int hueY = pickerY + pickerWidth + 3;
-        for (int i = 0; i < pickerWidth; i++) {
-            Color hueColor = Color.getHSBColor((float) i / pickerWidth, 1f, 1f);
-            RenderUtil.rect(context, pickerX + i, hueY, pickerX + i + 1, hueY + 6, hueColor.getRGB());
-        }
-        
-        int hueX = (int) (hsb[0] * pickerWidth);
-        RenderUtil.rect(context, pickerX + hueX - 2, hueY - 1, pickerX + hueX + 2, hueY + 7, Color.BLACK.getRGB());
-        
-        int alphaY = hueY + 8;
-        RenderUtil.horizontalGradient(context, pickerX, alphaY, pickerX + pickerWidth, alphaY + 6,
-            new Color(currentColor.getRed(), currentColor.getGreen(), currentColor.getBlue(), 0),
-            new Color(currentColor.getRed(), currentColor.getGreen(), currentColor.getBlue(), 255));
-        
-        int alphaX = (int) ((currentColor.getAlpha() / 255.0f) * pickerWidth);
-        RenderUtil.rect(context, pickerX + alphaX - 2, alphaY - 1, pickerX + alphaX + 2, alphaY + 7, Color.BLACK.getRGB());
-    }
-    
-    @Override
-    public void mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY) && button == 0) {
-            pickerOpen = !pickerOpen;
-            return;
-        }
-        
-        if (!pickerOpen) return;
-        
-        int pickerWidth = width - 10;
-        int pickerX = x + 5;
-        int pickerY = y + height + 2;
-        
-        if (mouseX >= pickerX && mouseX <= pickerX + pickerWidth &&
-            mouseY >= pickerY && mouseY <= pickerY + pickerWidth) {
-            dragging = true;
-            updateColorFromPicker(mouseX, mouseY);
-        }
-        
-        int hueY = pickerY + pickerWidth + 3;
-        if (mouseX >= pickerX && mouseX <= pickerX + pickerWidth &&
-            mouseY >= hueY && mouseY <= hueY + 6) {
-            dragging = true;
-            hsb[0] = (float) (mouseX - pickerX) / pickerWidth;
-            updateColor();
-        }
-        
-        int alphaY = hueY + 8;
-        if (mouseX >= pickerX && mouseX <= pickerX + pickerWidth &&
-            mouseY >= alphaY && mouseY <= alphaY + 6) {
-            draggingAlpha = true;
-            int alpha = (int) ((mouseX - pickerX) / pickerWidth * 255);
-            alpha = Math.max(0, Math.min(255, alpha));
-            Color c = (Color) setting.getValue();
-            setting.setValue(new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha));
-        }
-    }
-    
-    @Override
-    public void mouseReleased(double mouseX, double mouseY, int button) {
-        dragging = false;
-        draggingAlpha = false;
-    }
-    
-    @Override
-    public void mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (!pickerOpen) return;
-        
-        int pickerWidth = width - 10;
-        int pickerX = x + 5;
-        int pickerY = y + height + 2;
-        
-        if (dragging) {
-            if (mouseX >= pickerX && mouseX <= pickerX + pickerWidth &&
-                mouseY >= pickerY && mouseY <= pickerY + pickerWidth) {
-                updateColorFromPicker(mouseX, mouseY);
+        Color c = (Color) setting.getValue();
+        Color accent = ClickGuiModule.getInstance().color.getValue();
+        RenderUtil.roundRect(context, x, y, width, height, 10f, isHovered(mouseX, mouseY) ? 0x1AFFFFFF : 0x12FFFFFF);
+        int textY = y + (height - 8) / 2;
+        context.drawString(mc.font, setting.getName(), x + 10, textY, 0xFFE6E6E6);
+        String preview = String.format("#%02X%02X%02X", c.getRed(), c.getGreen(), c.getBlue());
+        context.drawString(mc.font, preview, x + width - 58 - mc.font.width(preview), textY, new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 235).getRGB());
+        RenderUtil.roundRect(context, x + width - 34, y + 4, 24, height - 8, 6f, c.getRGB());
+
+        if (open) {
+            int contentY = y + height + 8;
+            for (int i = 0; i < CHANNEL_NAMES.length; i++) {
+                int rowY = contentY + i * 22;
+                int value = getChannelValue(c, i);
+                drawChannelRow(context, CHANNEL_NAMES[i], CHANNEL_COLORS[i], value, x + 10, rowY, width - 20);
             }
-            
-            int hueY = pickerY + pickerWidth + 3;
-            if (mouseX >= pickerX && mouseX <= pickerX + pickerWidth &&
-                mouseY >= hueY && mouseY <= hueY + 6) {
-                hsb[0] = Math.max(0, Math.min(1, (float) (mouseX - pickerX) / pickerWidth));
-                updateColor();
-            }
-        }
-        
-        if (draggingAlpha) {
-            int alphaY = pickerOffsetY + pickerWidth + 11;
-            if (mouseX >= pickerX && mouseX <= pickerX + pickerWidth) {
-                int alpha = (int) ((mouseX - pickerX) / pickerWidth * 255);
-                alpha = Math.max(0, Math.min(255, alpha));
-                Color c = (Color) setting.getValue();
-                setting.setValue(new Color(c.getRed(), c.getGreen(), c.getBlue(), alpha));
+
+            if (draggingChannel >= 0) {
+                updateChannel(mouseX, draggingChannel);
             }
         }
     }
-    
-    private void updateColorFromPicker(double mouseX, double mouseY) {
-        int pickerWidth = width - 10;
-        int pickerX = x + 5;
-        int pickerY = y + height + 2;
-        
-        hsb[1] = (float) (mouseX - pickerX) / pickerWidth;
-        hsb[2] = 1 - (float) (mouseY - pickerY) / pickerWidth;
-        hsb[1] = Math.max(0, Math.min(1, hsb[1]));
-        hsb[2] = Math.max(0, Math.min(1, hsb[2]));
-        updateColor();
+
+    private void drawChannelRow(GuiGraphics context, String label, Color color, int value, int rowX, int rowY, int rowWidth) {
+        context.drawString(mc.font, label, rowX, rowY, 0xFFBDBDC7);
+        String valueText = String.valueOf(value);
+        context.drawString(mc.font, valueText, rowX + rowWidth - mc.font.width(valueText), rowY, 0xFFD4D4D8);
+
+        int trackY = rowY + 12;
+        int trackWidth = rowWidth;
+        int knobX = rowX + Math.round((value / 255f) * trackWidth);
+
+        RenderUtil.roundRect(context, rowX, trackY, trackWidth, 4, 2f, 0xFF2F2F38);
+        RenderUtil.roundRect(context, rowX, trackY, Math.max(4, knobX - rowX), 4, 2f, color.getRGB());
+        RenderUtil.roundRect(context, knobX - 4, trackY - 4, 8, 12, 4f, 0xFFFFFFFF);
     }
-    
-    private void updateColor() {
-        Color c = Color.getHSBColor(hsb[0], hsb[1], hsb[2]);
-        Color oldColor = (Color) setting.getValue();
-        setting.setValue(new Color(c.getRed(), c.getGreen(), c.getBlue(), oldColor.getAlpha()));
+
+    private int getChannelValue(Color color, int channel) {
+        return switch (channel) {
+            case 0 -> color.getRed();
+            case 1 -> color.getGreen();
+            case 2 -> color.getBlue();
+            case 3 -> color.getAlpha();
+            default -> 0;
+        };
     }
-    
-    public int getHeight() {
-        return pickerOpen ? height + PICKER_HEIGHT : height;
+
+    private void updateChannel(double mouseX, int channel) {
+        int rowX = x + 10;
+        int rowWidth = width - 20;
+        float percent = (float) Math.max(0.0, Math.min(1.0, (mouseX - rowX) / rowWidth));
+        int nextValue = Math.round(percent * 255f);
+        Color current = (Color) setting.getValue();
+        Color updated = switch (channel) {
+            case 0 -> new Color(nextValue, current.getGreen(), current.getBlue(), current.getAlpha());
+            case 1 -> new Color(current.getRed(), nextValue, current.getBlue(), current.getAlpha());
+            case 2 -> new Color(current.getRed(), current.getGreen(), nextValue, current.getAlpha());
+            case 3 -> new Color(current.getRed(), current.getGreen(), current.getBlue(), nextValue);
+            default -> current;
+        };
+        setting.setValue(updated);
+    }
+
+    @Override
+    public boolean mouseClicked(double mx, double my, int b) {
+        if (isHovered(mx, my)) {
+            if (b == 0) {
+                open = !open;
+            } else if (b == 1) {
+                setting.reset();
+                open = false;
+            }
+            return true;
+        }
+
+        if (!open || b != 0) {
+            return false;
+        }
+
+        int contentY = y + height + 8;
+        for (int i = 0; i < CHANNEL_NAMES.length; i++) {
+            int rowY = contentY + i * 22;
+            if (mx >= x + 10 && mx <= x + width - 10 && my >= rowY && my <= rowY + 20) {
+                draggingChannel = i;
+                updateChannel(mx, i);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public void mouseReleased(double mx, double my, int button) {
+        draggingChannel = -1;
+    }
+
+    @Override
+    public int getHeight() { return open ? height + 8 + CHANNEL_NAMES.length * 22 : height; }
+
+    @Override
+    public boolean isCapturingInput() {
+        return draggingChannel >= 0;
     }
 }

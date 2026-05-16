@@ -6,7 +6,8 @@ import me.alpha432.oxevy.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 
-import java.awt.*;
+import java.awt.Color;
+import java.util.Locale;
 
 public class SliderComponent extends SettingComponent {
     private static final Minecraft mc = Minecraft.getInstance();
@@ -18,85 +19,59 @@ public class SliderComponent extends SettingComponent {
     
     @Override
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        float min = setting.getMin() != null ? ((Number) setting.getMin()).floatValue() : 0f;
-        float max = setting.getMax() != null ? ((Number) setting.getMax()).floatValue() : 100f;
+        float min = ((Number) setting.getMin()).floatValue();
+        float max = ((Number) setting.getMax()).floatValue();
         float value = ((Number) setting.getValue()).floatValue();
-        
-        float percentage = (value - min) / (max - min);
-        int fillWidth = (int) (percentage * width);
-        
-        // Background
-        RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        
-        // Bar
-        int barHeight = 4;
-        int barY = y + height - barHeight - 2;
-        RenderUtil.rect(context, x + 5, barY, x + width - 5, barY + barHeight, 0xFF333333);
-        
-        int fillX2 = x + 5 + (int) (percentage * (width - 10));
-        RenderUtil.rect(context, x + 5, barY, fillX2, barY + barHeight, ClickGuiModule.getInstance().color.getValue().getRGB());
-        
-        // Label and value
-        String labelText = setting.getName();
-        String valueText = String.valueOf(setting.getValue());
-        context.drawString(mc.font, labelText, x + 5, y + 2, 0xFFBBBBBB);
-        context.drawString(mc.font, valueText, x + width - 5 - mc.font.width(valueText), y + 2, 0xFFFFFFFF);
-        
-        if (isHovered(mouseX, mouseY)) {
-            RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        }
-        
-        if (dragging) {
-            updateValue(mouseX);
-        }
-    }
-    
-    @Override
-    public void mouseClicked(double mouseX, double mouseY, int button) {
-        if (isHovered(mouseX, mouseY)) {
-            if (button == 0) {
-                dragging = true;
-                updateValue(mouseX);
-            } else if (button == 1) {
-                setting.reset();
-            }
-        }
-    }
-    
-    @Override
-    public void mouseReleased(double mouseX, double mouseY, int button) {
-        dragging = false;
+        float percent = (value - min) / (max - min);
+
+        Color accent = ClickGuiModule.getInstance().color.getValue();
+        RenderUtil.rect(context, x, y, x + width, y + height, isHovered(mouseX, mouseY) ? 0x12FFFFFF : 0x08FFFFFF);
+
+        int textY = y + 1;
+        context.drawString(mc.font, setting.getName(), x + 4, textY, 0xFFBBBBBB);
+
+        String valueText = formatValue((Number) setting.getValue());
+        context.drawString(mc.font, valueText, x + width - 4 - mc.font.width(valueText), textY, accent.getRGB());
+
+        int trackX = x + 4;
+        int trackY = y + height - 5;
+        int trackWidth = width - 8;
+        int activeTrack = new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 200).getRGB();
+        int knobX = trackX + Math.round(percent * trackWidth);
+
+        RenderUtil.rect(context, trackX, trackY, trackX + trackWidth, trackY + 2, 0xFF2F2F38);
+        RenderUtil.rect(context, trackX, trackY, Math.max(trackX, knobX), trackY + 2, activeTrack);
+
+        RenderUtil.rect(context, knobX - 2, trackY - 1, knobX + 2, trackY + 3, 0xFFFFFFFF);
+
+        if (dragging) updateValue(mouseX);
     }
     
     private void updateValue(double mouseX) {
-        float min = setting.getMin() != null ? ((Number) setting.getMin()).floatValue() : 0f;
-        float max = setting.getMax() != null ? ((Number) setting.getMax()).floatValue() : 100f;
-        
-        double percentage = Math.max(0, Math.min(1, (mouseX - (x + 5)) / (width - 10)));
-        float rawValue = (float) (min + percentage * (max - min));
-        rawValue = Math.max(min, Math.min(max, rawValue));
-        
-        if (setting.getValue() instanceof Integer) {
-            int snapped = Math.round(rawValue);
-            setting.setValue(snapped);
-        } else if (setting.getValue() instanceof Float) {
-            float snapped = snap(rawValue, 0.1f);
-            setting.setValue(Math.max(min, Math.min(max, snapped)));
-        } else if (setting.getValue() instanceof Double) {
-            double snapped = snap(rawValue, 0.1d);
-            double clamped = Math.max(min, Math.min(max, snapped));
-            setting.setValue(clamped);
+        float min = ((Number) setting.getMin()).floatValue();
+        float max = ((Number) setting.getMax()).floatValue();
+        double percent = Math.max(0, Math.min(1, (mouseX - (x + 4)) / (width - 8)));
+        float val = (float) (min + percent * (max - min));
+        if (setting.getValue() instanceof Integer) setting.setValue(Math.round(val));
+        else if (setting.getValue() instanceof Float) setting.setValue((float) (Math.round(val * 10.0) / 10.0));
+        else if (setting.getValue() instanceof Double) setting.setValue(Math.round(val * 10.0) / 10.0);
+    }
+    
+    private String formatValue(Number number) {
+        if (number instanceof Integer || number instanceof Long || number instanceof Short || number instanceof Byte) {
+            return String.valueOf(number.intValue());
         }
+        return String.format(Locale.ROOT, "%.1f", number.doubleValue());
     }
-
-    private static float snap(float v, float step) {
-        if (step <= 0) return v;
-        return Math.round(v / step) * step;
+    
+    @Override public boolean mouseClicked(double mx, double my, int b) {
+        if (isHovered(mx, my) && b == 0) {
+            dragging = true;
+            updateValue(mx);
+            return true;
+        }
+        return false;
     }
-
-    private static double snap(double v, double step) {
-        if (step <= 0) return v;
-        return Math.round(v / step) * step;
-    }
+    @Override public void mouseReleased(double mx, double my, int b) { dragging = false; }
+    @Override public boolean isCapturingInput() { return dragging; }
 }
-

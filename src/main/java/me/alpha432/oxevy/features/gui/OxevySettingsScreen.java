@@ -44,6 +44,7 @@ public class OxevySettingsScreen extends Screen {
     private static final int MODULE_WIDTH = 130;
 
     private static final String HUD_EDITOR_ICON = "⚙";
+    private static final String CONFIG_ICON = "💾";
     private static final int ICON_BTN_SIZE = 14;
     private static final int ICON_BTN_PAD = 6;
 
@@ -89,6 +90,16 @@ public class OxevySettingsScreen extends Screen {
         // Main window background
         RenderUtil.rect(context, x, y, x + WIDTH, y + HEIGHT, 0xFF121212);
         RenderUtil.rect(context, x, y, x + WIDTH, y + 2, ClickGuiModule.getInstance().color.getValue().getRGB());
+
+        // Config save button (top-right, left of HUD button)
+        int cfgBtnX = x + WIDTH - 2 * ICON_BTN_PAD - 2 * ICON_BTN_SIZE;
+        int cfgBtnY = y + ICON_BTN_PAD;
+        boolean cfgBtnHover = mouseX >= cfgBtnX && mouseX <= cfgBtnX + ICON_BTN_SIZE && mouseY >= cfgBtnY && mouseY <= cfgBtnY + ICON_BTN_SIZE;
+        int cfgBtnBg = cfgBtnHover ? 0x33FFFFFF : 0x22000000;
+        RenderUtil.rect(context, cfgBtnX, cfgBtnY, cfgBtnX + ICON_BTN_SIZE, cfgBtnY + ICON_BTN_SIZE, cfgBtnBg);
+        RenderUtil.rect(context, cfgBtnX, cfgBtnY, cfgBtnX + ICON_BTN_SIZE, cfgBtnY + ICON_BTN_SIZE, 0x33FFFFFF, 1.0f);
+        int cfgIconColor = cfgBtnHover ? 0xFFFFFFFF : 0xFFBBBBBB;
+        context.drawString(mc.font, CONFIG_ICON, cfgBtnX + 4, cfgBtnY + 3, cfgIconColor);
 
         // HUD editor quick button (top-right)
         int btnX = x + WIDTH - ICON_BTN_PAD - ICON_BTN_SIZE;
@@ -155,7 +166,7 @@ public class OxevySettingsScreen extends Screen {
         if (selectedModule != null) {
             context.drawString(mc.font, selectedModule.getDisplayName() + " Settings", settingsX + 15, y + 15, 0xFFAAAAAA);
 
-            int settingY = y + 35 - settingsScrollOffset;
+            int settingY = y + 32 - settingsScrollOffset;
             maxSettingsScroll = 0;
             for (Setting<?> setting : selectedModule.getSettings()) {
                 if (setting.getName().equals("Enabled") || setting.getName().equals("DisplayName")) continue;
@@ -165,7 +176,7 @@ public class OxevySettingsScreen extends Screen {
                 comp.x = settingsX + 15;
                 comp.y = settingY;
                 comp.render(context, mouseX, mouseY, delta);
-                settingY += comp.height + 5;
+                settingY += comp.height + 4;
             }
             maxSettingsScroll = Math.max(0, settingY - (y + settingsAreaHeight) - 35);
         } else {
@@ -199,6 +210,14 @@ public class OxevySettingsScreen extends Screen {
 
         int x = (mc.getWindow().getGuiScaledWidth() - WIDTH) / 2;
         int y = (mc.getWindow().getGuiScaledHeight() - HEIGHT) / 2;
+
+        // Config save button
+        int cfgBtnX = x + WIDTH - ICON_BTN_PAD * 3 - ICON_BTN_SIZE * 2;
+        int cfgBtnY = y + ICON_BTN_PAD;
+        if (button == 0 && mouseX >= cfgBtnX && mouseX <= cfgBtnX + ICON_BTN_SIZE && mouseY >= cfgBtnY && mouseY <= cfgBtnY + ICON_BTN_SIZE) {
+            mc.setScreen(new ConfigsScreen());
+            return true;
+        }
 
         // HUD editor quick button
         int btnX = x + WIDTH - ICON_BTN_PAD - ICON_BTN_SIZE;
@@ -345,14 +364,14 @@ public class OxevySettingsScreen extends Screen {
         Object value = setting.getValue();
         int compWidth = WIDTH - SIDEBAR_WIDTH - MODULE_WIDTH - 30;
 
-        if (value instanceof Boolean) return new BooleanComponent((Setting<Boolean>) setting, x, y, compWidth, 16);
-        if (value instanceof Number && setting.getMin() != null) return new SliderComponent((Setting<Number>) setting, x, y, compWidth, 16);
-        if (value instanceof Bind) return new BindComponent((Setting<Bind>) setting, x, y, compWidth, 16);
-        if (setting.isEnumSetting()) return new EnumComponent(setting, x, y, compWidth, 16);
-        if (setting.isStringSetting()) return new StringComponent((Setting<String>) setting, x, y, compWidth, 16);
-        if (setting.isButtonSetting()) return new ButtonComponent((Setting<Runnable>) setting, x, y, compWidth, 16);
-        if (value instanceof Color) return new ColorComponent((Setting<Color>) setting, x, y, compWidth, 16);
-        return new StringSettingComponent(setting, x, y, compWidth, 16);
+        if (value instanceof Boolean) return new BooleanComponent((Setting<Boolean>) setting, x, y, compWidth, 12);
+        if (value instanceof Number && setting.getMin() != null) return new SliderComponent((Setting<Number>) setting, x, y, compWidth, 12);
+        if (value instanceof Bind) return new BindComponent((Setting<Bind>) setting, x, y, compWidth, 12);
+        if (setting.isEnumSetting()) return new EnumComponent(setting, x, y, compWidth, 12);
+        if (setting.isStringSetting()) return new StringComponent((Setting<String>) setting, x, y, compWidth, 12);
+        if (setting.isButtonSetting()) return new ButtonComponent((Setting<Runnable>) setting, x, y, compWidth, 12);
+        if (value instanceof Color) return new ColorComponent((Setting<Color>) setting, x, y, compWidth, 12);
+        return new StringSettingComponent(setting, x, y, compWidth, 12);
     }
 
     @Override

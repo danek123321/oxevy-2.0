@@ -6,44 +6,37 @@ import me.alpha432.oxevy.util.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 
-import java.awt.*;
+import java.awt.Color;
 
 public class BooleanComponent extends SettingComponent {
     private static final Minecraft mc = Minecraft.getInstance();
-    
     public BooleanComponent(Setting<Boolean> setting, int x, int y, int width, int height) {
         super(setting, x, y, width, height);
     }
-    
     @Override
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        boolean value = (Boolean) setting.getValue();
+        boolean val = (Boolean) setting.getValue();
         boolean hovered = isHovered(mouseX, mouseY);
-        
-        // Background
-        RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        
-        // Label
-        context.drawString(mc.font, setting.getName(), x + 5, y + (height - 8) / 2, 0xFFBBBBBB);
-        
-        // Checkbox/Toggle look
-        int toggleSize = 10;
-        int toggleX = x + width - toggleSize - 5;
-        int toggleY = y + (height - toggleSize) / 2;
-        
-        int color = value ? ClickGuiModule.getInstance().color.getValue().getRGB() : 0xFF333333;
-        RenderUtil.rect(context, toggleX, toggleY, toggleX + toggleSize, toggleY + toggleSize, color);
-        
-        if (hovered) {
-            RenderUtil.rect(context, x, y, x + width, y + height, 0x11FFFFFF);
-        }
+        Color accent = ClickGuiModule.getInstance().color.getValue();
+
+        RenderUtil.roundRect(context, x, y, width, height, 10f, hovered ? 0x1AFFFFFF : 0x12FFFFFF);
+        context.drawString(mc.font, setting.getName(), x + 10, y + (height - 8) / 2, 0xFFE6E6E6);
+
+        int trackWidth = 22;
+        int trackHeight = 10;
+        int trackX = x + width - trackWidth - 10;
+        int trackY = y + (height - trackHeight) / 2;
+        int activeTrack = new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 220).getRGB();
+
+        RenderUtil.roundRect(context, trackX, trackY, trackWidth, trackHeight, 5f, val ? activeTrack : 0xFF2F2F38);
+        RenderUtil.roundRect(context, val ? trackX + trackWidth - 9 : trackX + 1, trackY + 1, 8, 8, 4f, 0xFFFFFFFF);
     }
-    
     @Override
-    public void mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (isHovered(mouseX, mouseY) && button == 0) {
             setting.setValue(!(Boolean) setting.getValue());
+            return true;
         }
+        return false;
     }
 }
-

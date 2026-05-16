@@ -3,6 +3,7 @@ package me.alpha432.oxevy;
 import me.alpha432.oxevy.manager.*;
 import me.alpha432.oxevy.util.BuildConfig;
 import me.alpha432.oxevy.util.TextUtil;
+import me.alpha432.oxevy.web.ClickGuiWebBridge;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;
 import org.apache.logging.log4j.LogManager;
@@ -64,7 +65,10 @@ public class Oxevy implements ModInitializer, ClientModInitializer {
 
         configManager.load();
         colorManager.init();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> configManager.save()));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            ClickGuiWebBridge.stop();
+            configManager.save();
+        }));
 
         long endTime = System.nanoTime();
 

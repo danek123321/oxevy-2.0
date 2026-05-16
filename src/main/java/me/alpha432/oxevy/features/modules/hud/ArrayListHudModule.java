@@ -21,16 +21,22 @@ import java.util.Set;
 
 public class ArrayListHudModule extends HudModule {
     public final Setting<Boolean> sortAlphabetical = bool("SortAlphabetical", false);
-    public final Setting<Boolean> rainbow = bool("Rainbow", true);
+    public final Setting<Boolean> rainbow = bool("Rainbow", false);
     public final Setting<Boolean> smoothAnimations = bool("SmoothAnimations", true);
     public final Setting<Float> animationSpeed = num("AnimationSpeed", 0.15f, 0.05f, 0.5f);
+    public final Setting<Boolean> background = bool("Background", true);
     public final Setting<Boolean> bar = bool("Bar", true);
-    public final Setting<Integer> spacing = num("Spacing", 1, 0, 5);
+    public final Setting<Boolean> icons = bool("Icons", true);
+    public final Setting<Boolean> shadow = bool("Shadow", true);
+    public final Setting<Integer> spacing = num("Spacing", 3, 0, 8);
+    public final Setting<Integer> textOffset = num("TextOffset", 4, 0, 10);
 
     private final Map<Module, Float> moduleAnimations = new HashMap<>();
     private final List<Module> enabledModules = new ArrayList<>(128);
     private final Map<Module, Integer> cachedNameWidths = new HashMap<>(128);
     private final Set<Module> enabledSet = new HashSet<>(128);
+
+    private static final String[] CATEGORY_ICONS = {"⚔", "◈", "◉", "◐", "⚙", "⚡", "▤"};
 
     public ArrayListHudModule() {
         super("ArrayList", "Shows enabled modules", 100, 50);
@@ -48,17 +54,18 @@ public class ArrayListHudModule extends HudModule {
         enabledModules.clear();
         enabledSet.clear();
         cachedNameWidths.clear();
+
         for (Module module : Oxevy.moduleManager.getModules()) {
-            if ((module.isEnabled() || (smoothAnimations.getValue() && moduleAnimations.getOrDefault(module, 0f) > 0.01f)) 
+            if ((module.isEnabled() || (smoothAnimations.getValue() && moduleAnimations.getOrDefault(module, 0f) > 0.01f))
                 && !module.hidden && module.getCategory() != Module.Category.HUD) {
                 enabledModules.add(module);
                 if (module.isEnabled()) enabledSet.add(module);
             }
         }
 
-        // Cache name widths once per frame; used for sorting and alignment.
         for (Module module : enabledModules) {
-            cachedNameWidths.put(module, mc.font.width(module.getName()));
+            String displayText = icons.getValue() ? getCategoryIcon(module.getCategory()) + " " + module.getName() : module.getName();
+            cachedNameWidths.put(module, mc.font.width(displayText));
         }
 
         if (sortAlphabetical.getValue()) {
@@ -73,21 +80,29 @@ public class ArrayListHudModule extends HudModule {
         for (Module module : enabledModules) {
             maxWidth = Math.max(maxWidth, cachedNameWidths.getOrDefault(module, 0));
         }
-        
-        setWidth(maxWidth + (bar.getValue() ? 6 : 4));
-        setHeight(enabledModules.isEmpty() ? 10 : enabledModules.size() * (lineHeight + spacing.getValue()));
-        
+
+        int iconOffset = icons.getValue() ? mc.font.width("⚔ ") : 0;
+        setWidth(maxWidth + (bar.getValue() ? 12 : 8) + iconOffset);
+
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         boolean isLeft = x < screenWidth / 2.0f;
 
         final boolean doRainbow = rainbow.getValue();
         final boolean doSmooth = smoothAnimations.getValue();
-        final float speed = doSmooth ? animationSpeed.getValue() : 1.0f;
-        final int baseColor = ClickGuiModule.getInstance().color.getValue().getRGB();
-        
+        final float speed = animationSpeed.getValue();
+        final boolean showIcons = icons.getValue();
+        final boolean useShadow = shadow.getValue();
+        final int customSpacing = spacing.getValue();
+        final int offset = textOffset.getValue();
+
+        final ClickGuiModule clickGui = ClickGuiModule.getInstance();
+        final int baseColor = clickGui != null && clickGui.color.getValue() != null
+            ? clickGui.color.getValue().getRGB()
+            : 0xFF0084FF;
+
         for (int i = 0; i < enabledModules.size(); i++) {
             Module module = enabledModules.get(i);
-            String text = module.getName();
+            String text = showIcons ? getCategoryIcon(module.getCategory()) + " " + module.getName() : module.getName();
             int textWidth = cachedNameWidths.getOrDefault(module, mc.font.width(text));
 
             float targetAnim = enabledSet.contains(module) ? 1.0f : 0.0f;
@@ -98,36 +113,62 @@ public class ArrayListHudModule extends HudModule {
 
             if (currentAnim < 0.01f && !enabledSet.contains(module)) continue;
 
-            int color = doRainbow 
-                ? Color.getHSBColor(((System.currentTimeMillis() + (i * 200)) / 10 % 360) / 360f, 0.7f, 1.0f).getRGB()
-                : baseColor;
-            
-            int finalColor = AnimationUtil.interpolateColor(0, color, currentAnim);
-            
-            int textX;
-            if (isLeft) {
-                textX = (int) (x + 2 + (bar.getValue() ? 2 : 0));
-                if (bar.getValue()) {
-                    RenderUtil.rect(ctx, x, drawY, x + 2, drawY + lineHeight + spacing.getValue(), color);
-                }
+            int color;
+            if (doRainbow) {
+                float hue = ((System.currentTimeMillis() + (i * 100)) % 3000) / 3000f;
+                color = Color.getHSBColor(hue, 0.8f, 1.0f).getRGB();
             } else {
-                textX = (int) (x + getWidth() - 2 - textWidth - (bar.getValue() ? 2 : 0));
-                if (bar.getValue()) {
-                    RenderUtil.rect(ctx, x + getWidth() - 2, drawY, x + getWidth(), drawY + lineHeight + spacing.getValue(), color);
-                }
+                color = baseColor;
             }
 
-            ctx.pose().pushMatrix();
-            if (doSmooth) {
-                float slide = (1.0f - currentAnim) * (isLeft ? -20 : 20);
-                ctx.pose().translate(slide, 0);
-            }
-            ctx.drawString(mc.font, text, textX, (int) (drawY + spacing.getValue() / 2f), finalColor);
-            ctx.pose().popMatrix();
+            float slide = doSmooth ? (1.0f - currentAnim) * (isLeft ? -textWidth - 20 : textWidth + 20) : 0;
+            float alpha = currentAnim;
 
-            drawY += lineHeight + spacing.getValue();
+            int textX;
+            int bgStart, bgEnd, barStart, barEnd;
+
+            if (isLeft) {
+                textX = (int) (x + offset + slide);
+                bgStart = (int) (x + slide);
+                bgEnd = (int) (x + textWidth + offset + 6 + slide);
+                barStart = (int) (x + slide);
+                barEnd = (int) (x + 3 + slide);
+            } else {
+                textX = (int) (x + getWidth() - textWidth - offset + slide);
+                bgStart = (int) (x + getWidth() - textWidth - offset - 6 + slide);
+                bgEnd = (int) (x + getWidth() + slide);
+                barStart = (int) (x + getWidth() - 3 + slide);
+                barEnd = (int) (x + getWidth() + slide);
+            }
+
+            if (background.getValue()) {
+                int bgColor = new Color(13, 16, 22, (int)(180 * alpha)).getRGB();
+                RenderUtil.rect(ctx, bgStart, drawY, bgEnd, drawY + lineHeight + customSpacing, bgColor);
+            }
+
+            if (bar.getValue()) {
+                RenderUtil.rect(ctx, barStart, drawY, barEnd, drawY + lineHeight + customSpacing, color);
+            }
+
+            if (showIcons && isLeft) {
+                String icon = getCategoryIcon(module.getCategory());
+                ctx.drawString(mc.font, icon, textX, (int) (drawY + customSpacing / 2f), color, useShadow);
+                textX += mc.font.width(icon + " ");
+            }
+
+            int textColor = AnimationUtil.interpolateColor(ColorUtil.toRGBA(0, 0, 0, 0), 0xFFFFFFFF, currentAnim);
+            ctx.drawString(mc.font, text, textX, (int) (drawY + customSpacing / 2f), textColor, useShadow);
+
+            drawY += (lineHeight + customSpacing) * currentAnim;
         }
 
         moduleAnimations.entrySet().removeIf(entry -> !enabledSet.contains(entry.getKey()) && entry.getValue() < 0.01f);
+    }
+
+    private String getCategoryIcon(Module.Category category) {
+        if (category == null || category.ordinal() >= CATEGORY_ICONS.length) {
+            return "•";
+        }
+        return CATEGORY_ICONS[category.ordinal()];
     }
 }

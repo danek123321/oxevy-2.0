@@ -17,8 +17,8 @@ public class ButtonComponent extends SettingComponent {
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         boolean hovered = isHovered(mouseX, mouseY);
         
-        // Background
-        int bgColor = hovered ? ClickGuiModule.getInstance().color.getValue().getRGB() : 0x22FFFFFF;
+        // Background - Green shades
+        int bgColor = hovered ? 0xFF4ADE80 : 0x224ADE80; // Green when hovered, semi-transparent green when not
         RenderUtil.rect(context, x, y, x + width, y + height, bgColor);
         
         // Label
@@ -27,9 +27,11 @@ public class ButtonComponent extends SettingComponent {
     }
     
     @Override
-    public void mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (isHovered(mouseX, mouseY) && button == 0) {
             setting.run();
+            return true;
         }
+        return false;
     }
 }

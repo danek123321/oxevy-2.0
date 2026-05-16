@@ -41,6 +41,8 @@ public class ModuleManager implements Jsonable, Util {
         // COMBAT
         register(new KillAuraModule());
         register(new AimBotModule());
+        register(new BowAimbotModule());
+        register(new TriggerBotModule());
         register(new CriticalsModule());
         register(new KeyPearlModule());
         register(new Strafe());
@@ -66,6 +68,9 @@ public class ModuleManager implements Jsonable, Util {
         // MISC
         register(new MCFModule());
         register(new AutoToolModule());
+        register(new AutoDropModule());
+        register(new AntiAFKModule());
+        register(new DerpModule());
 
         // MOVEMENT
         register(new StepModule());
@@ -80,6 +85,15 @@ public class ModuleManager implements Jsonable, Util {
         register(new SpiderModule());
         register(new SafeWalkModule());
         register(new BlinkModule());
+        register(new AutoWalkModule());
+        register(new HighJumpModule());
+        register(new JesusModule());
+        register(new BunnyHopModule());
+        register(new ParkourModule());
+        register(new NoWebModule());
+        register(new AutoSwimModule());
+        register(new GlideModule());
+        register(new FastLadderModule());
 
         // PLAYER
         register(new FastPlaceModule());
@@ -92,13 +106,34 @@ public class ModuleManager implements Jsonable, Util {
         register(new NukerModule());
         register(new AutoClickerModule());
         register(new AutoRespawnModule());
+        register(new BaseFinderPlusModule());
 
         // RENDER
         register(new BlockHighlightModule());
-        register(new NametagsModule());
         register(new ChestESPModule());
         register(new TracerModule());
         register(new FullbrightModule());
+        register(new TrajectoriesModule());
+        register(new StorageESPModule());
+        register(new PlayerESPModule());
+        register(new MobESPModule());
+        register(new ItemESPModule());
+        register(new PortalESPModule());
+        register(new OpenWaterESPModule());
+        register(new HoleESPModule());
+        register(new TrapESPModule());
+        register(new BaseFinderModule());
+        register(new NoFogModule());
+        register(new NoHurtcamModule());
+        register(new AntiBlindModule());
+        register(new TrueSightModule());
+        register(new HealthTagsModule());
+        register(new NameTagsModule());
+        register(new XRayModule());
+        register(new ChunkTrailsModule());
+
+        // COMBAT
+        register(new SurroundModule());
 
         // Set default enabled modules
         FpsHudModule fps = (FpsHudModule) getModuleByClass(FpsHudModule.class);
@@ -129,6 +164,16 @@ public class ModuleManager implements Jsonable, Util {
         FullbrightModule fullbright = (FullbrightModule) getModuleByClass(FullbrightModule.class);
         if (fullbright != null) {
             fullbright.enable();
+        }
+
+        WatermarkHudModule watermarkHud = (WatermarkHudModule) getModuleByClass(WatermarkHudModule.class);
+        if (watermarkHud != null) {
+            watermarkHud.enable();
+        }
+
+        MenuWatermark menuWatermark = (MenuWatermark) getModuleByClass(MenuWatermark.class);
+        if (menuWatermark != null) {
+            menuWatermark.enable();
         }
 
         LOGGER.info("Registered {} modules", modules.size());
@@ -196,7 +241,17 @@ public class ModuleManager implements Jsonable, Util {
     }
 
     public void onKeyPressed(int key) {
-        if (key <= 0 || mc.screen != null) return;
+        if (key <= 0) return;
+        
+        // Allow toggling ClickGui module even when screen is open
+        for (Module module : getModules()) {
+            if (module.getName().equals("ClickGui") && module.getBind().getKey() == key) {
+                module.toggle();
+                return;
+            }
+        }
+        
+        if (mc.screen != null) return;
         stream().filter(module -> module.getBind().getKey() == key).forEach(Module::toggle);
     }
 
