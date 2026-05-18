@@ -63,6 +63,8 @@ public class ModuleManager implements Jsonable, Util {
         register(new TargetHudModule());
         register(new TargetInfoHudModule());
         register(new ArmorHudModule());
+        register(new MusicPlayerHudModule());
+        register(new InventoryHudModule());
         register(new MenuWatermark());
 
         // MISC

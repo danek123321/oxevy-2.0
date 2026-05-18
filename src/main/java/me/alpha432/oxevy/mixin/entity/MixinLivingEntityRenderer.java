@@ -1,0 +1,20 @@
+package me.alpha432.oxevy.mixin.entity;
+
+import me.alpha432.oxevy.Oxevy;
+import me.alpha432.oxevy.features.modules.render.NameTagsModule;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.world.entity.LivingEntity;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+@Mixin(LivingEntityRenderer.class)
+public abstract class MixinLivingEntityRenderer {
+    @Inject(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getInstance()Lnet/minecraft/client/Minecraft;", ordinal = 0), cancellable = true)
+    private void shouldForceLabel(LivingEntity entity, double distanceSq, CallbackInfoReturnable<Boolean> cir) {
+        NameTagsModule nameTags = Oxevy.moduleManager.getModuleByClass(NameTagsModule.class);
+        if (nameTags != null && nameTags.shouldForcePlayerNametags())
+            cir.setReturnValue(true);
+    }
+}
