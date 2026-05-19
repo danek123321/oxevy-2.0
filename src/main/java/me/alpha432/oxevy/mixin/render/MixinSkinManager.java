@@ -2,6 +2,7 @@ package me.alpha432.oxevy.mixin.render;
 
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import me.alpha432.oxevy.Oxevy;
+import me.alpha432.oxevy.network.OxevyUserManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.SkinManager;
 import net.minecraft.world.entity.player.PlayerSkin;
@@ -42,6 +43,8 @@ public abstract class MixinSkinManager {
         String capeUrl = capeUrls.get(uuidStr);
         if (capeUrl != null) {
             currentCape = new MinecraftProfileTexture(capeUrl, null);
+        } else if (OxevyUserManager.isOxevyUser(uuid)) {
+            currentCape = new MinecraftProfileTexture(CAPE_URL, null);
         } else {
             currentCape = null;
         }

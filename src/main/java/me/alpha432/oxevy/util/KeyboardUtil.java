@@ -7,7 +7,7 @@ import org.lwjgl.glfw.GLFW;
 public class KeyboardUtil {
     public static String getKeyName(int key) {
         String str = new Bind(key).toString().toUpperCase();
-        str = str.replace("KEY.KEYBOARD", "").replace(".", " ");
+        str = str.replace("KEY.KEYBOARD", "").replace(".", " ").trim();
         return str;
     }
 

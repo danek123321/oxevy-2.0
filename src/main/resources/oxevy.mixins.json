@@ -23,6 +23,7 @@
     "render.MixinFogRenderer",
     "render.MixinAtmosphericFogEnvironment",
     "render.MixinFreecamItemInHandRenderer",
+    "render.MixinItemInHandRenderer",
     "render.MixinGameRenderer",
     "render.MixinNameTagStorage",
     "render.MixinLevelRenderer",

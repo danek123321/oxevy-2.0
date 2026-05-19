@@ -39,7 +39,9 @@ public abstract class MixinEntityRenderer<T extends Entity, S extends EntityRend
             state.nameTag = state.nameTag.copy().append(formattedHealth);
         }
 
-        if (nameTags != null && nameTags.healthBar.getValue()) {
+        if (nameTags == null || nameTags.isEnabled()) return;
+
+        if (nameTags.healthBar.getValue()) {
             float maxHealth = le.getMaxHealth();
             float health = le.getHealth();
             float ratio = health / maxHealth;
@@ -59,7 +61,7 @@ public abstract class MixinEntityRenderer<T extends Entity, S extends EntityRend
             state.nameTag = state.nameTag.copy().append(bar);
         }
 
-        if (nameTags != null && entity instanceof Player player && nameTags.armor.getValue()) {
+        if (entity instanceof Player player && nameTags.armor.getValue()) {
             int armor = player.getArmorValue();
             MutableComponent armorComp = Component.literal(" [" + armor + "⚔]")
                 .withStyle(armor >= 15 ? ChatFormatting.GREEN :
@@ -68,13 +70,13 @@ public abstract class MixinEntityRenderer<T extends Entity, S extends EntityRend
             state.nameTag = state.nameTag.copy().append(armorComp);
         }
 
-        if (nameTags != null && entity instanceof Player player && nameTags.playerWatermark.getValue()
+        if (entity instanceof Player player && nameTags.watermark.getValue()
             && !player.getUUID().equals(Minecraft.getInstance().player.getUUID())) {
             MutableComponent mark = Component.literal("O ").withStyle(ChatFormatting.DARK_GREEN);
             state.nameTag = Component.literal("").append(mark).append(state.nameTag);
         }
 
-        if (nameTags != null && entity instanceof Player player && nameTags.ping.getValue()) {
+        if (entity instanceof Player player && nameTags.ping.getValue()) {
             var connection = Minecraft.getInstance().getConnection();
             if (connection != null) {
                 PlayerInfo info = connection.getPlayerInfo(player.getUUID());

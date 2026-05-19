@@ -16,7 +16,9 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 
@@ -27,6 +29,14 @@ public class MixinNameTagStorage {
 
     @Shadow @Final
     List<SubmitNodeStorage.NameTagSubmit> nameTagSubmitsNormal;
+
+    @Inject(method = "add(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/CameraRenderState;)V", at = @At("HEAD"), cancellable = true)
+    private void onAdd(PoseStack matrices, @Nullable Vec3 vec3d, int i, Component text, boolean bl, int j, double d, CameraRenderState state, CallbackInfo ci) {
+        NameTagsModule nameTags = Oxevy.moduleManager.getModuleByClass(NameTagsModule.class);
+        if (nameTags != null && nameTags.isEnabled()) {
+            ci.cancel();
+        }
+    }
 
     @WrapOperation(method = "add(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/CameraRenderState;)V", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;scale(FFF)V"))
     private void wrapLabelScale(PoseStack matrices, float x, float y, float z, Operation<Void> original, PoseStack matrices2, @Nullable Vec3 vec3d, int i, Component text, boolean bl, int j, double d, CameraRenderState state) {

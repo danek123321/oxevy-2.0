@@ -2,8 +2,10 @@ package me.alpha432.oxevy.mixin.entity;
 
 import me.alpha432.oxevy.Oxevy;
 import me.alpha432.oxevy.features.modules.movement.FreeCam;
+import me.alpha432.oxevy.features.modules.render.FreeLookModule;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
@@ -15,6 +17,7 @@ import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LocalPlayer.class)
@@ -39,6 +42,15 @@ public abstract class MixinFreecamLocalPlayer extends AbstractClientPlayer {
             freecam.turn(deltaYaw, deltaPitch);
             return;
         }
+
+        FreeLookModule freelook = Oxevy.moduleManager.getModuleByClass(FreeLookModule.class);
+        if (freelook.isEnabled() && freelook.mode.getValue() == FreeLookModule.Mode.Camera) {
+            freelook.cameraYaw += (float) deltaYaw;
+            freelook.cameraPitch += (float) deltaPitch;
+            freelook.cameraPitch = Mth.clamp(freelook.cameraPitch, -90, 90);
+            return;
+        }
+
         super.turn(deltaYaw, deltaPitch);
     }
 
@@ -66,6 +78,22 @@ public abstract class MixinFreecamLocalPlayer extends AbstractClientPlayer {
             cir.setReturnValue(entityHit);
         } else {
             cir.setReturnValue(blockHit);
+        }
+    }
+
+    @Inject(method = "aiStep", at = @At("HEAD"), cancellable = true)
+    private void onAiStep(CallbackInfo ci) {
+        FreeCam freecam = Oxevy.moduleManager.getModuleByClass(FreeCam.class);
+        if (freecam.isEnabled()) {
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "sendPosition", at = @At("HEAD"), cancellable = true)
+    private void onSendPosition(CallbackInfo ci) {
+        FreeCam freecam = Oxevy.moduleManager.getModuleByClass(FreeCam.class);
+        if (freecam.isEnabled()) {
+            ci.cancel();
         }
     }
 }

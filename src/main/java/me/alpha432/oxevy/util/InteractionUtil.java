@@ -58,7 +58,7 @@ public class InteractionUtil implements Util {
 
     public static void useItem(BlockPos pos, InteractionHand hand) {
         if (mc.level == null || mc.player == null || mc.gameMode == null) return;
-        Direction direction = mc.hitResult != null ? ((BlockHitResult) mc.hitResult).getDirection() : Direction.DOWN;
+        Direction direction = mc.hitResult instanceof BlockHitResult bhr ? bhr.getDirection() : Direction.DOWN;
         InteractionResult result = mc.gameMode.useItemOn(mc.player, hand, new BlockHitResult(
                 Vec3.atCenterOf(pos), direction, pos, false
         ));
@@ -77,7 +77,7 @@ public class InteractionUtil implements Util {
         Direction direction = calcSide(pos);
         if (direction == null) {
             if (airPlace)
-                direction = mc.hitResult != null ? ((BlockHitResult) mc.hitResult).getDirection() : Direction.DOWN;
+                direction = mc.hitResult instanceof BlockHitResult bhr ? bhr.getDirection() : Direction.DOWN;
             else return false;
         }
         BlockPos bp = airPlace ? pos : pos.relative(direction);

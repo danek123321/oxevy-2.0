@@ -176,7 +176,7 @@ public class OxevySettingsScreen extends Screen {
                 comp.x = settingsX + 15;
                 comp.y = settingY;
                 comp.render(context, mouseX, mouseY, delta);
-                settingY += comp.height + 4;
+                settingY += comp.getHeight() + 4;
             }
             maxSettingsScroll = Math.max(0, settingY - (y + settingsAreaHeight) - 35);
         } else {
@@ -242,10 +242,14 @@ public class OxevySettingsScreen extends Screen {
 
         // Module clicks
         int moduleX = x + SIDEBAR_WIDTH;
-        int moduleY = y + 15;
+        int moduleY = y + 15 - moduleScrollOffset;
         List<Module> mods = modulesByCategory.get(selectedCategory);
         if (mods != null) {
             for (Module mod : mods) {
+                if (moduleY < y - 5 || moduleY > y + HEIGHT - 20) {
+                    moduleY += 18;
+                    continue;
+                }
                 if (mouseX >= moduleX && mouseX <= moduleX + MODULE_WIDTH && mouseY >= moduleY - 2 && mouseY <= moduleY + 12) {
                     if (button == 0) {
                         selectedModule = mod;
@@ -260,12 +264,16 @@ public class OxevySettingsScreen extends Screen {
             }
         }
 
-        // Setting clicks
+        // Setting clicks — iterate in render order, skip invisible settings
         if (selectedModule != null) {
-            int settingsAreaTop = y + 30;
-            int settingsAreaHeight = HEIGHT - 30;
-            for (SettingComponent comp : settingComponents.values()) {
-                if (comp.y >= settingsAreaTop - settingsScrollOffset && comp.isHovered(mouseX, mouseY)) {
+            for (Setting<?> setting : selectedModule.getSettings()) {
+                if (setting.getName().equals("Enabled") || setting.getName().equals("DisplayName")) continue;
+                if (!setting.isVisible()) continue;
+
+                SettingComponent comp = settingComponents.get(setting);
+                if (comp == null) continue;
+
+                if (comp.isHovered(mouseX, mouseY)) {
                     comp.mouseClicked(mouseX, mouseY, button);
                     if (comp instanceof StringComponent && ((StringComponent) comp).isFocused()) {
                         focusedStringSetting = (Setting<String>) comp.getSetting();

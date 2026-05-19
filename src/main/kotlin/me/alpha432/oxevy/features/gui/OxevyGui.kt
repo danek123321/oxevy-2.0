@@ -59,7 +59,7 @@ class OxevyGui : Screen(Component.literal("Oxevy")) {
         )
     }
 
-    private fun guiLeft(): Int = (mc.window.guiScaledWidth - GUI_W) / 2
+    private fun guiLeft(): Int = (mc.window.guiScaledWidth - GUI_W) / 4
     private fun guiTop(): Int = (mc.window.guiScaledHeight - GUI_H) / 2
 
     private fun contentX() = guiLeft() + SIDEBAR_W
@@ -271,10 +271,10 @@ class OxevyGui : Screen(Component.literal("Oxevy")) {
 
     private fun drawDrawer(ctx: GuiGraphics, gx: Float, gy: Float, mx: Int, my: Int, delta: Float) {
         drawerOpenAnim = (drawerOpenAnim + delta * 0.12f).coerceAtMost(1f)
-        val drawerX = (gx + GUI_W - DRAWER_W * drawerOpenAnim).toInt()
+        val drawerX = (gx + GUI_W + 8 + (DRAWER_W + 8) * (drawerOpenAnim - 1f)).toInt()
 
-        RenderUtil.rect(ctx, gx, gy, drawerX.toFloat(), gy + GUI_H, 0x55000000.toInt())
-        RenderUtil.rect(ctx, drawerX.toFloat(), gy + 4f, (drawerX + DRAWER_W).toFloat(), gy + GUI_H, BG_DRAWER)
+        RenderUtil.rect(ctx, drawerX.toFloat(), gy, (drawerX + DRAWER_W).toFloat(), gy + GUI_H, BG_DRAWER)
+        RenderUtil.rect(ctx, drawerX.toFloat(), gy, (drawerX + DRAWER_W).toFloat(), gy + 3f, ACCENT_PRIMARY)
 
         val mod = selModule ?: return
         val header = "${mod.getDisplayName()} Settings"
@@ -293,11 +293,12 @@ class OxevyGui : Screen(Component.literal("Oxevy")) {
         val settings = mod.getSettings().filter { it.name != "Enabled" && it.name != "DisplayName" && it.isVisible }
 
         for (setting in settings) {
-            if (sy + 20 < clipTop) { sy += getComponentHeight(setting); continue }
+            val h = getComponentHeight(setting)
+            if (sy + h < clipTop) { sy += h; continue }
             if (sy > clipBottom) break
             val comp = getOrCreateComponent(setting, drawerX + 16, sy, DRAWER_W - 32)
             comp.render(ctx, mx, my, delta)
-            sy += comp.getHeight() + 6
+            sy += h
         }
 
         drawerMaxScroll = maxOf(0, sy - clipBottom + drawerScroll)
@@ -353,8 +354,8 @@ class OxevyGui : Screen(Component.literal("Oxevy")) {
         }
 
         if (showDrawer) {
-            val drawerX = gx + GUI_W - DRAWER_W
-            if (mx in drawerX..<gx + GUI_W && my in gy..<gy + GUI_H) {
+            val drawerX = gx + GUI_W + 8
+            if (mx in drawerX..<drawerX + DRAWER_W && my in gy..<gy + GUI_H) {
                 val backX = drawerX + DRAWER_W - 16
                 if (mx in backX - 4..<backX + 12 && my in gy + 10..<gy + 24) {
                     closeDrawer()
@@ -454,8 +455,8 @@ class OxevyGui : Screen(Component.literal("Oxevy")) {
         val gy = guiTop()
 
         if (showDrawer) {
-            val drawerX = gx + GUI_W - DRAWER_W
-            if (mx in drawerX.toDouble()..<(gx + GUI_W).toDouble() && my in gy.toDouble()..<(gy + GUI_H).toDouble()) {
+            val drawerX = gx + GUI_W + 8
+            if (mx in drawerX.toDouble()..<(drawerX + DRAWER_W).toDouble() && my in gy.toDouble()..<(gy + GUI_H).toDouble()) {
                 drawerScroll = (drawerScroll - (vertical * scrollSpeed).toInt()).coerceIn(0, drawerMaxScroll)
                 return true
             }

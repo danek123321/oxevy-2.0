@@ -1,30 +1,34 @@
 package me.alpha432.oxevy.features.modules.movement;
 
-import me.alpha432.oxevy.event.impl.render.Render3DEvent;
+import me.alpha432.oxevy.features.commands.Command;
 import me.alpha432.oxevy.features.modules.Module;
 import me.alpha432.oxevy.features.settings.Setting;
-import me.alpha432.oxevy.util.render.RenderUtil;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFW;
 
-import java.awt.Color;
-
 public class FreeCam extends Module {
 
-    private final Setting<Double> horizontalSpeed = num("HSpeed", 1.0, 0.05, 10.0);
-    private final Setting<Double> verticalSpeed = num("VSpeed", 1.0, 0.05, 5.0);
-    private final Setting<Boolean> tracer = bool("Tracer", false);
-    private final Setting<Boolean> hideHand = bool("HideHand", true);
-    private final Setting<Boolean> disableOnDamage = bool("DisableOnDamage", true);
+    private final Setting<Double> speed = num("Speed", 1.0, 0.05, 10.0);
+    private final Setting<Double> scrollSensitivity = num("ScrollSensitivity", 0.25, 0.0, 2.0);
+    private final Setting<Boolean> toggleOnDamage = bool("ToggleOnDamage", true);
+    private final Setting<Boolean> toggleOnDeath = bool("ToggleOnDeath", false);
+    private final Setting<Boolean> toggleOnLog = bool("ToggleOnLog", true);
     private final Setting<Boolean> reloadChunks = bool("ReloadChunks", true);
+    private final Setting<Boolean> showHands = bool("ShowHands", false);
     private final Setting<Boolean> lookAtPlayer = bool("LookAtPlayer", false);
+    private final Setting<Boolean> tracer = bool("Tracer", false);
 
-    private Vec3 camPos;
-    private Vec3 prevCamPos;
-    private float camYaw;
-    private float camPitch;
+    private Vec3 pos;
+    private Vec3 prevPos;
+    private Vec3 frozenPos;
+    private float yaw;
+    private float pitch;
+    private double speedValue;
+    private CameraType prevPerspective;
+    private boolean forward, backward, right, left, up, down;
     private float lastHealth;
 
     public FreeCam() {
@@ -35,11 +39,24 @@ public class FreeCam extends Module {
     public void onEnable() {
         if (nullCheck()) return;
 
-        lastHealth = Float.MIN_VALUE;
-        camPos = mc.player.getEyePosition();
-        prevCamPos = camPos;
-        camYaw = mc.player.getYRot();
-        camPitch = mc.player.getXRot();
+        LocalPlayer player = mc.player;
+        pos = player.getEyePosition();
+        prevPos = pos;
+        frozenPos = player.position();
+        yaw = player.getYRot();
+        pitch = player.getXRot();
+        speedValue = speed.getValue();
+        lastHealth = player.getHealth();
+        prevPerspective = mc.options.getCameraType();
+
+        if (mc.options.getCameraType() == CameraType.THIRD_PERSON_FRONT) {
+            yaw += 180;
+            pitch *= -1;
+        }
+
+        unpress();
+
+        if (reloadChunks.getValue()) mc.levelRenderer.allChanged();
     }
 
     @Override
@@ -47,105 +64,156 @@ public class FreeCam extends Module {
         if (nullCheck()) return;
 
         if (reloadChunks.getValue()) {
-            mc.levelRenderer.allChanged();
+            mc.execute(mc.levelRenderer::allChanged);
         }
+
+        mc.player.setNoGravity(false);
+        mc.options.setCameraType(prevPerspective);
     }
 
     @Override
     public void onTick() {
         if (nullCheck()) return;
 
-        if (camPos == null) {
-            camPos = mc.player.getEyePosition();
-            prevCamPos = camPos;
-            camYaw = mc.player.getYRot();
-            camPitch = mc.player.getXRot();
-        }
-
         LocalPlayer player = mc.player;
 
-        float currentHealth = player.getHealth();
-        if (disableOnDamage.getValue() && currentHealth < lastHealth) {
+        if (pos == null) {
+            pos = player.getEyePosition();
+            prevPos = pos;
+            frozenPos = player.position();
+            yaw = player.getYRot();
+            pitch = player.getXRot();
+        }
+
+        if (player.isDeadOrDying() && toggleOnDeath.getValue()) {
             toggle();
-            return;
-        }
-        lastHealth = currentHealth;
-
-        if (mc.screen != null) {
-            prevCamPos = camPos;
+            Command.sendMessage("FreeCam toggled off because you died.");
             return;
         }
 
-        double forward = 0, strafe = 0;
-        if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_W) == 1) forward = 1;
-        if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_S) == 1) forward = -1;
-        if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_A) == 1) strafe = -1;
-        if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_D) == 1) strafe = 1;
+        float health = player.getHealth();
+        if (toggleOnDamage.getValue() && health < lastHealth) {
+            toggle();
+            Command.sendMessage("FreeCam toggled off because you took damage.");
+            return;
+        }
+        lastHealth = health;
 
-        double vertical = 0;
-        if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_SPACE) == 1) vertical = 1;
-        if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_LEFT_SHIFT) == 1) vertical = -1;
+        // Freeze player body in place
+        player.setDeltaMovement(Vec3.ZERO);
+        player.setNoGravity(true);
+        if (frozenPos != null) {
+            player.setPos(frozenPos.x, frozenPos.y, frozenPos.z);
+        }
 
-        double yawRad = camYaw * Mth.DEG_TO_RAD;
-        double sinYaw = Mth.sin(yawRad);
-        double cosYaw = Mth.cos(yawRad);
-        double offsetX = strafe * cosYaw - forward * sinYaw;
-        double offsetZ = strafe * sinYaw + forward * cosYaw;
+        if (!mc.options.getCameraType().isFirstPerson()) mc.options.setCameraType(CameraType.FIRST_PERSON);
 
-        double vSpeed = Mth.clamp(horizontalSpeed.getValue() * verticalSpeed.getValue(), 0.05, 10);
-        double offsetY = vertical * vSpeed;
+        if (mc.screen != null && !forward && !backward && !right && !left && !up && !down) {
+            prevPos = pos;
+            return;
+        }
 
-        Vec3 offsetVec = new Vec3(offsetX, 0, offsetZ).scale(horizontalSpeed.getValue()).add(0, offsetY, 0);
-        prevCamPos = camPos;
-        camPos = camPos.add(offsetVec);
+        Vec3 forwardVec = Vec3.directionFromRotation(0, yaw);
+        Vec3 rightVec = Vec3.directionFromRotation(0, yaw + 90);
+        double velX = 0, velY = 0, velZ = 0;
+
+        double s = 0.5;
+        if (GLFW.glfwGetKey(mc.getWindow().handle(), GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS) s = 1.0;
+
+        boolean hasForward = false;
+        if (forward) {
+            velX += forwardVec.x * s * speedValue;
+            velZ += forwardVec.z * s * speedValue;
+            hasForward = true;
+        }
+        if (backward) {
+            velX -= forwardVec.x * s * speedValue;
+            velZ -= forwardVec.z * s * speedValue;
+            hasForward = true;
+        }
+
+        boolean hasStrafe = false;
+        if (right) {
+            velX += rightVec.x * s * speedValue;
+            velZ += rightVec.z * s * speedValue;
+            hasStrafe = true;
+        }
+        if (left) {
+            velX -= rightVec.x * s * speedValue;
+            velZ -= rightVec.z * s * speedValue;
+            hasStrafe = true;
+        }
+
+        if (hasForward && hasStrafe) {
+            double diag = 1.0 / Math.sqrt(2);
+            velX *= diag;
+            velZ *= diag;
+        }
+
+        if (up) velY += s * speedValue;
+        if (down) velY -= s * speedValue;
+
+        prevPos = pos;
+        pos = pos.add(velX, velY, velZ);
 
         if (lookAtPlayer.getValue()) {
-            Vec3 playerCenter = player.position().add(0, player.getBbHeight() * 0.5, 0);
-            Vec3 dir = playerCenter.subtract(camPos);
-            camYaw = (float) Math.toDegrees(Math.atan2(-dir.x, dir.z));
-            camPitch = -(float) Math.toDegrees(Math.atan2(dir.y, Math.sqrt(dir.x * dir.x + dir.z * dir.z)));
-            camPitch = Mth.clamp(camPitch, -90, 90);
+            Vec3 center = player.position().add(0, player.getBbHeight() * 0.5, 0);
+            Vec3 dir = center.subtract(pos);
+            yaw = (float) Math.toDegrees(Math.atan2(-dir.x, dir.z));
+            pitch = -(float) Math.toDegrees(Math.atan2(dir.y, Math.sqrt(dir.x * dir.x + dir.z * dir.z)));
+            pitch = Mth.clamp(pitch, -90, 90);
         }
-    }
-
-    @Override
-    public void onRender3D(Render3DEvent event) {
-        if (!tracer.getValue() || mc.player == null) return;
-
-        Vec3 playerPos = mc.player.position().add(0, mc.player.getBbHeight() * 0.5, 0);
-        Color color = new Color(255, 255, 255, 160);
-        RenderUtil.drawLine(event.getMatrix(), camPos, playerPos, color, 1.5f, true);
     }
 
     @Override
     public String getDisplayInfo() {
-        return horizontalSpeed.getValue() + ", " + verticalSpeed.getValue();
+        return String.format("%.1f", speedValue);
     }
 
     public Vec3 getCamPos(float partialTicks) {
-        return Mth.lerp(partialTicks, prevCamPos, camPos);
+        if (pos == null || prevPos == null) return Vec3.ZERO;
+        return Mth.lerp(partialTicks, prevPos, pos);
     }
 
-    public float getCamYaw() {
-        return camYaw;
-    }
-
-    public float getCamPitch() {
-        return camPitch;
-    }
+    public float getCamYaw() { return yaw; }
+    public float getCamPitch() { return pitch; }
 
     public Vec3 getScaledCamDir(double scale) {
-        return Vec3.directionFromRotation(camPitch, camYaw).scale(scale);
+        return Vec3.directionFromRotation(pitch, yaw).scale(scale);
     }
 
     public boolean shouldHideHand() {
-        return isEnabled() && hideHand.getValue();
+        return isEnabled() && !showHands.getValue();
     }
 
     public void turn(double deltaYaw, double deltaPitch) {
         if (lookAtPlayer.getValue()) return;
-        camYaw += (float) (deltaYaw * 0.15);
-        camPitch += (float) (deltaPitch * 0.15);
-        camPitch = Mth.clamp(camPitch, -90, 90);
+        yaw += (float) deltaYaw;
+        pitch += (float) deltaPitch;
+        pitch = Mth.clamp(pitch, -90, 90);
+    }
+
+    public void onScroll(double delta) {
+        if (scrollSensitivity.getValue() > 0) {
+            speedValue += delta * 0.25 * scrollSensitivity.getValue() * speedValue;
+            speedValue = Mth.clamp(speedValue, 0.1, 50.0);
+        }
+    }
+
+    private void unpress() {
+        long handle = mc.getWindow().handle();
+        forward = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS;
+        backward = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
+        left = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS;
+        right = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS;
+        up = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_SPACE) == GLFW.GLFW_PRESS;
+        down = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS;
+
+        mc.options.keyUp.setDown(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+        mc.options.keyJump.setDown(false);
+        mc.options.keyShift.setDown(false);
     }
 }

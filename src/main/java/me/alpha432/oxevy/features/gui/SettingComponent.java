@@ -23,7 +23,7 @@ public abstract class SettingComponent {
     public boolean keyPressed(KeyEvent input) { return false; }
     public boolean isCapturingInput() { return false; }
     public boolean isHovered(double mouseX, double mouseY) {
-        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + getHeight();
     }
     public int getHeight() { return height; }
     public Setting getSetting() { return setting; }

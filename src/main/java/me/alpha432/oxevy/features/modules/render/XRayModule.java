@@ -45,14 +45,14 @@ public class XRayModule extends Module {
         oreNamesCache = new ArrayList<>(Arrays.asList(blocks.getValue().split(",")));
         oreNamesCache.replaceAll(String::trim);
         Collections.sort(oreNamesCache);
-        mc.options.gamma().set(16.0);
-        mc.levelRenderer.allChanged();
+        if (mc.options != null) mc.options.gamma().set(16.0);
+        if (mc.levelRenderer != null) mc.levelRenderer.allChanged();
     }
 
     @Override
     public void onDisable() {
-        mc.options.gamma().set(0.5);
-        mc.levelRenderer.allChanged();
+        if (mc.options != null) mc.options.gamma().set(0.5);
+        if (mc.levelRenderer != null) mc.levelRenderer.allChanged();
     }
 
     public Boolean shouldDrawSide(BlockState state, BlockPos pos) {

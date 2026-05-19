@@ -11,10 +11,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LivingEntityRenderer.class)
 public abstract class MixinLivingEntityRenderer {
-    @Inject(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getInstance()Lnet/minecraft/client/Minecraft;", ordinal = 0), cancellable = true)
+    @Inject(method = "shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z", at = @At("HEAD"), cancellable = true)
     private void shouldForceLabel(LivingEntity entity, double distanceSq, CallbackInfoReturnable<Boolean> cir) {
         NameTagsModule nameTags = Oxevy.moduleManager.getModuleByClass(NameTagsModule.class);
-        if (nameTags != null && nameTags.shouldForcePlayerNametags())
-            cir.setReturnValue(true);
+        if (nameTags != null && nameTags.isEnabled() && nameTags.players.getValue()) {
+            cir.setReturnValue(false);
+        }
     }
 }

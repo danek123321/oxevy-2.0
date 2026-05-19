@@ -1,6 +1,7 @@
 package me.alpha432.oxevy;
 
 import me.alpha432.oxevy.manager.*;
+import me.alpha432.oxevy.network.OxevyNetworkManager;
 import me.alpha432.oxevy.util.BuildConfig;
 import me.alpha432.oxevy.util.TextUtil;
 import me.alpha432.oxevy.web.ClickGuiWebBridge;
@@ -62,6 +63,7 @@ public class Oxevy implements ModInitializer, ClientModInitializer {
         commandManager.init();
         moduleManager.init();
         friendManager.init();
+        OxevyNetworkManager.init();
 
         configManager.load();
         colorManager.init();

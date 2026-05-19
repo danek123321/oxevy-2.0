@@ -15,9 +15,46 @@ public class WatermarkHudModule extends HudModule {
     private static final Identifier WATERMARK_TEX = Identifier.fromNamespaceAndPath("oxevy", "textures/watermark.png");
     private static final int TEX_W = 100;
     private static final int TEX_H = 50;
+    private static final float PADDING = 4f;
 
     public WatermarkHudModule() {
         super("Watermark", "Displays watermark texture", TEX_W, TEX_H);
+        pos.setVisibility(v -> false);
+        enabled.setVisibility(v -> false);
+        bind.setVisibility(v -> false);
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+
+    @Override
+    public void enable() {
+        super.enable();
+    }
+
+    @Override
+    public void disable() {
+    }
+
+    @Override
+    public void toggle() {
+    }
+
+    @Override
+    public float getX() {
+        return PADDING;
+    }
+
+    @Override
+    public float getY() {
+        return PADDING;
+    }
+
+    @Override
+    public boolean isHovering() {
+        return false;
     }
 
     @Override

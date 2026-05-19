@@ -66,6 +66,7 @@ public class ModuleManager implements Jsonable, Util {
         register(new MusicPlayerHudModule());
         register(new InventoryHudModule());
         register(new MenuWatermark());
+        register(new KeybindsHudModule());
 
         // MISC
         register(new MCFModule());
@@ -73,6 +74,7 @@ public class ModuleManager implements Jsonable, Util {
         register(new AutoDropModule());
         register(new AntiAFKModule());
         register(new DerpModule());
+        register(new AutoReconnect());
 
         // MOVEMENT
         register(new StepModule());
@@ -133,6 +135,22 @@ public class ModuleManager implements Jsonable, Util {
         register(new NameTagsModule());
         register(new XRayModule());
         register(new ChunkTrailsModule());
+        register(new OxevyLogoModule());
+        register(new ZoomModule());
+        register(new ChamsModule());
+        register(new PopChamsModule());
+        register(new LogoutSpotsModule());
+        register(new FreeLookModule());
+        register(new BetterTabModule());
+        register(new NoRenderModule());
+        register(new ESPModule());
+        register(new HandViewModule());
+        register(new CameraTweaksModule());
+        register(new BlockSelectionModule());
+        register(new TunnelESPModule());
+        register(new TrailModule());
+        register(new EntityOwnerModule());
+        register(new ItemPhysicsModule());
 
         // COMBAT
         register(new SurroundModule());
@@ -268,8 +286,17 @@ public class ModuleManager implements Jsonable, Util {
 
     @Override
     public void fromJson(JsonElement element) {
+        if (element == null || !element.isJsonObject()) {
+            return;
+        }
+
+        JsonObject object = element.getAsJsonObject();
         for (Module module : getModules()) {
-            module.fromJson(element.getAsJsonObject().get(module.getName()));
+            try {
+                module.fromJson(object.get(module.getName()));
+            } catch (Throwable throwable) {
+                LOGGER.error("Failed to load module config for {}", module.getName(), throwable);
+            }
         }
     }
 

@@ -9,7 +9,6 @@ import java.util.Locale;
 
 public class FpsHudModule extends HudModule {
     private static final int HISTORY_SIZE = 60;
-    private static final int GRAPH_HEIGHT = 24;
 
     public final Setting<Boolean> showMinMax = bool("MinMax", true);
     public final Setting<Boolean> showAverage = bool("Average", true);
@@ -17,14 +16,34 @@ public class FpsHudModule extends HudModule {
     public final Setting<Boolean> showGraph = bool("Graph", true);
     public final Setting<Boolean> performanceWarnings = bool("Warnings", true);
 
+    // Smoothing: alpha = 0.06 for ~16 frame window (heavily smooths jitter)
+    private static final float SMOOTHING_ALPHA = 0.06f;
+
+    private long lastFrameNanos;
+    private float currentFps;
+    private float smoothFps;
+    private float minFps = Float.MAX_VALUE;
+    private float maxFps;
+    private double sumFps;
+    private int samples;
+
+    // Circular buffer for graph
     private final float[] fpsHistory = new float[HISTORY_SIZE];
     private int historyIndex;
-    private long lastFrameTime = -1;
-    private float currentFps;
-    private float minFps = 999;
-    private float maxFps;
-    private float sumFps;
-    private int samples;
+
+    // Cached text to avoid per-frame formatting
+    private String cachedFpsText = "";
+    private String cachedMinMaxText = "";
+    private String cachedAvgText = "";
+    private String cachedFrameTimeText = "";
+    private int cachedFpsWidth;
+    private int cachedMinMaxWidth;
+    private int cachedAvgWidth;
+    private int cachedFrameTimeWidth;
+    private int lastDisplayedFps = -1;
+    private boolean textDirty = true;
+
+    private int cachedFpsColor = 0xFF44FF44;
 
     public FpsHudModule() {
         super("FPS", "FPS counter with graph and stats", 120, 60);
@@ -32,22 +51,7 @@ public class FpsHudModule extends HudModule {
 
     @Override
     public void drawContent(Render2DEvent e) {
-        long now = System.currentTimeMillis();
-        if (lastFrameTime > 0) {
-            float dt = (now - lastFrameTime) / 1000f;
-            if (dt > 0 && dt < 1f) {
-                currentFps = 1f / dt;
-                if (currentFps > 0 && currentFps < 10000) {
-                    fpsHistory[historyIndex % HISTORY_SIZE] = currentFps;
-                    historyIndex++;
-                    minFps = Math.min(minFps, currentFps);
-                    maxFps = Math.max(maxFps, currentFps);
-                    sumFps += currentFps;
-                    samples++;
-                }
-            }
-        }
-        lastFrameTime = now;
+        measureFps();
 
         float x = getX();
         float y = getY();
@@ -59,88 +63,65 @@ public class FpsHudModule extends HudModule {
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         boolean isLeft = x < screenWidth / 2.0f;
 
-        String fpsColorCode = currentFps >= 60 ? "§a" : currentFps >= 30 ? "§e" : "§c";
-        String fpsStr = "§fFPS: " + fpsColorCode + (int) currentFps;
-        int fpsWidth = mc.font.width(fpsStr);
-        int fpsTextX;
-        if (isLeft) {
-            fpsTextX = (int) (x + 2);
-        } else {
-            fpsTextX = (int) (x + getWidth() - 2 - fpsWidth);
+        updateCachedText();
+        updateCachedColors();
+
+        // Main FPS line
+        int textX = getTextX(x, isLeft, cachedFpsWidth);
+        if (textX >= 0) {
+            ctx.drawString(mc.font, cachedFpsText, textX, (int) drawY, cachedFpsColor);
         }
-        ctx.drawString(mc.font, fpsStr, fpsTextX, (int) drawY, getFpsColor(currentFps));
-        maxWidth = Math.max(maxWidth, fpsWidth);
+        maxWidth = Math.max(maxWidth, cachedFpsWidth);
         drawY += lineHeight;
 
-        if (showMinMax.getValue()) {
-            String minMaxStr = "§7Min: §f" + (int) minFps + " §7Max: §f" + (int) maxFps;
-            int minMaxWidth = mc.font.width(minMaxStr);
-            int minMaxTextX;
-            if (isLeft) {
-                minMaxTextX = (int) (x + 2);
-            } else {
-                minMaxTextX = (int) (x + getWidth() - 2 - minMaxWidth);
+        // Min/Max
+        if (showMinMax.getValue() && samples > 0) {
+            int mmX = getTextX(x, isLeft, cachedMinMaxWidth);
+            if (mmX >= 0) {
+                ctx.drawString(mc.font, cachedMinMaxText, mmX, (int) drawY, 0xFFCCCCCC);
             }
-            ctx.drawString(mc.font, minMaxStr, minMaxTextX, (int) drawY, 0xFF_CC_CC_CC);
-            maxWidth = Math.max(maxWidth, minMaxWidth);
+            maxWidth = Math.max(maxWidth, cachedMinMaxWidth);
             drawY += lineHeight;
         }
 
+        // Average
         if (showAverage.getValue() && samples > 0) {
-            String avgStr = "§7Avg: §f" + String.format(Locale.US, "%.1f", sumFps / samples);
-            int avgWidth = mc.font.width(avgStr);
-            int avgTextX;
-            if (isLeft) {
-                avgTextX = (int) (x + 2);
-            } else {
-                avgTextX = (int) (x + getWidth() - 2 - avgWidth);
+            int avgX = getTextX(x, isLeft, cachedAvgWidth);
+            if (avgX >= 0) {
+                ctx.drawString(mc.font, cachedAvgText, avgX, (int) drawY, 0xFFCCCCCC);
             }
-            ctx.drawString(mc.font, avgStr, avgTextX, (int) drawY, 0xFF_CC_CC_CC);
-            maxWidth = Math.max(maxWidth, avgWidth);
+            maxWidth = Math.max(maxWidth, cachedAvgWidth);
             drawY += lineHeight;
         }
 
+        // Frame time
         if (showFrameTime.getValue()) {
-            String msStr = "§7Frame: §f" + String.format(Locale.US, "%.1f", currentFps > 0 ? 1000f / currentFps : 0) + " ms";
-            int msWidth = mc.font.width(msStr);
-            int msTextX;
-            if (isLeft) {
-                msTextX = (int) (x + 2);
-            } else {
-                msTextX = (int) (x + getWidth() - 2 - msWidth);
+            int ftX = getTextX(x, isLeft, cachedFrameTimeWidth);
+            if (ftX >= 0) {
+                ctx.drawString(mc.font, cachedFrameTimeText, ftX, (int) drawY, 0xFFCCCCCC);
             }
-            ctx.drawString(mc.font, msStr, msTextX, (int) drawY, 0xFF_CC_CC_CC);
-            maxWidth = Math.max(maxWidth, msWidth);
+            maxWidth = Math.max(maxWidth, cachedFrameTimeWidth);
             drawY += lineHeight;
         }
 
+        // Graph
         if (showGraph.getValue() && historyIndex > 0) {
-            int graphW = Math.min(HISTORY_SIZE * 2, 100);
-            float gx = x, gy = drawY, maxVal = 1f;
-            for (int i = 0; i < HISTORY_SIZE; i++) if (fpsHistory[i] > maxVal) maxVal = fpsHistory[i];
-            for (int i = 0; i < Math.min(historyIndex, HISTORY_SIZE); i++) {
-                int idx = (historyIndex - 1 - i + HISTORY_SIZE) % HISTORY_SIZE;
-                float f = fpsHistory[idx];
-                int barH = (int) ((f / maxVal) * (GRAPH_HEIGHT - 2));
-                if (barH > 0) RenderUtil.rect(ctx, gx + graphW - 2 - i * (graphW / (float) HISTORY_SIZE), gy + GRAPH_HEIGHT - barH - 1, gx + graphW - i * (graphW / (float) HISTORY_SIZE), gy + GRAPH_HEIGHT - 1, getFpsColor(f));
-            }
-            drawY += GRAPH_HEIGHT + 2;
-            maxWidth = Math.max(maxWidth, graphW);
+            drawGraph(ctx, x, drawY);
+            drawY += 26;
+            maxWidth = Math.max(maxWidth, 100);
         }
 
+        // Warning
         if (performanceWarnings.getValue()) {
             String warning = getPerformanceWarning();
             if (warning != null) {
-                String warningStr = "§c⚠ " + warning;
-                int warningWidth = mc.font.width("⚠ " + warning);
-                int warningTextX;
-                if (isLeft) {
-                    warningTextX = (int) (x + 2);
-                } else {
-                    warningTextX = (int) (x + getWidth() - 2 - warningWidth);
+                String warnStr = "§c⚠ " + warning;
+                int warnWidth = mc.font.width(warnStr);
+                int warnX = getTextX(x, isLeft, warnWidth);
+                if (warnX >= 0) {
+                    ctx.drawString(mc.font, warnStr, warnX, (int) drawY, 0xFFFF5555);
                 }
-                ctx.drawString(mc.font, warningStr, warningTextX, (int) drawY, 0xFFFF5555);
-                maxWidth = Math.max(maxWidth, warningWidth);
+                maxWidth = Math.max(maxWidth, warnWidth);
                 drawY += lineHeight;
             }
         }
@@ -149,9 +130,122 @@ public class FpsHudModule extends HudModule {
         setHeight(drawY - y);
     }
 
-    private int getFpsColor(float fps) { return fps >= 60 ? 0xFF_44FF44 : fps >= 30 ? 0xFF_FFFF44 : 0xFF_FF4444; }
-    private String getPerformanceWarning() { if (currentFps > 0 && currentFps < 25) return "Low FPS"; long usedMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory(); if (usedMem > Runtime.getRuntime().maxMemory() * 0.9) return "High memory usage"; return null; }
+    private void measureFps() {
+        long now = System.nanoTime();
+        if (lastFrameNanos > 0) {
+            float dt = (now - lastFrameNanos) / 1_000_000_000f;
+            if (dt > 0 && dt < 1f) {
+                currentFps = 1f / dt;
+
+                // Exponential moving average for stability
+                if (samples == 0) {
+                    smoothFps = currentFps;
+                } else {
+                    smoothFps = smoothFps * (1f - SMOOTHING_ALPHA) + currentFps * SMOOTHING_ALPHA;
+                }
+
+                if (currentFps > 0 && currentFps < 10000) {
+                    fpsHistory[historyIndex % HISTORY_SIZE] = currentFps;
+                    historyIndex++;
+                    minFps = Math.min(minFps, currentFps);
+                    maxFps = Math.max(maxFps, currentFps);
+                    sumFps += currentFps;
+                    samples++;
+                }
+
+                int displayFps = Math.round(smoothFps);
+                if (displayFps != lastDisplayedFps) {
+                    lastDisplayedFps = displayFps;
+                    textDirty = true;
+                }
+            }
+        }
+        lastFrameNanos = now;
+    }
+
+    private void updateCachedText() {
+        if (!textDirty && samples > 0) return;
+
+        int display = Math.round(smoothFps);
+        String colorCode = display >= 60 ? "§a" : display >= 30 ? "§e" : "§c";
+        cachedFpsText = "§fFPS: " + colorCode + display;
+        cachedFpsWidth = mc.font.width(cachedFpsText);
+
+        if (showMinMax.getValue() && samples > 0) {
+            cachedMinMaxText = "§7Min: §f" + (int) minFps + " §7Max: §f" + (int) maxFps;
+            cachedMinMaxWidth = mc.font.width(cachedMinMaxText);
+        }
+
+        if (showAverage.getValue() && samples > 0) {
+            cachedAvgText = "§7Avg: §f" + String.format(Locale.US, "%.1f", sumFps / samples);
+            cachedAvgWidth = mc.font.width(cachedAvgText);
+        }
+
+        if (showFrameTime.getValue()) {
+            float ms = smoothFps > 0 ? 1000f / smoothFps : 0;
+            cachedFrameTimeText = "§7Frame: §f" + String.format(Locale.US, "%.1f", ms) + " ms";
+            cachedFrameTimeWidth = mc.font.width(cachedFrameTimeText);
+        }
+
+        textDirty = false;
+    }
+
+    private void updateCachedColors() {
+        if (smoothFps >= 60) cachedFpsColor = 0xFF44FF44;
+        else if (smoothFps >= 30) cachedFpsColor = 0xFFFFFF44;
+        else cachedFpsColor = 0xFFFF4444;
+    }
+
+    private int getTextX(float x, boolean isLeft, int textWidth) {
+        if (isLeft) {
+            return (int) (x + 2);
+        } else {
+            return (int) (x + getWidth() - 2 - textWidth);
+        }
+    }
+
+    private void drawGraph(GuiGraphics ctx, float gx, float gy) {
+        float maxVal = 1f;
+        float step = 100f / HISTORY_SIZE;
+
+        for (int i = 0; i < Math.min(historyIndex, HISTORY_SIZE); i++) {
+            float f = fpsHistory[i];
+            if (f > maxVal) maxVal = f;
+        }
+
+        for (int i = 0; i < Math.min(historyIndex, HISTORY_SIZE); i++) {
+            int idx = (historyIndex - 1 - i + HISTORY_SIZE) % HISTORY_SIZE;
+            float f = fpsHistory[idx];
+            int barH = (int) ((f / maxVal) * 22);
+            if (barH > 0) {
+                int color = f >= 60 ? 0xFF44FF44 : f >= 30 ? 0xFFFFFF44 : 0xFFFF4444;
+                float barX = gx + 100 - step * (i + 1);
+                RenderUtil.rect(ctx, barX, gy + 24 - barH, barX + step - 1, gy + 24, color);
+            }
+        }
+    }
+
+    private int getFpsColor(float fps) {
+        return fps >= 60 ? 0xFF44FF44 : fps >= 30 ? 0xFFFFFF44 : 0xFFFF4444;
+    }
+
+    private String getPerformanceWarning() {
+        if (smoothFps > 0 && smoothFps < 25) return "Low FPS";
+        long usedMem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        if (usedMem > Runtime.getRuntime().maxMemory() * 0.9) return "High memory usage";
+        return null;
+    }
 
     @Override
-    public void onDisable() { historyIndex = 0; minFps = 999; maxFps = sumFps = samples = 0; lastFrameTime = -1; }
+    public void onDisable() {
+        historyIndex = 0;
+        minFps = Float.MAX_VALUE;
+        maxFps = 0;
+        sumFps = 0;
+        samples = 0;
+        lastFrameNanos = 0;
+        smoothFps = 0;
+        textDirty = true;
+        lastDisplayedFps = -1;
+    }
 }

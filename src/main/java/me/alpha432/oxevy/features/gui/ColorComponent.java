@@ -90,6 +90,18 @@ public class ColorComponent extends SettingComponent {
 
     @Override
     public boolean mouseClicked(double mx, double my, int b) {
+        if (b == 0 && open) {
+            int contentY = y + height + 8;
+            for (int i = 0; i < CHANNEL_NAMES.length; i++) {
+                int rowY = contentY + i * 22;
+                if (mx >= x + 10 && mx <= x + width - 10 && my >= rowY && my <= rowY + 20) {
+                    draggingChannel = i;
+                    updateChannel(mx, i);
+                    return true;
+                }
+            }
+        }
+
         if (isHovered(mx, my)) {
             if (b == 0) {
                 open = !open;
@@ -98,20 +110,6 @@ public class ColorComponent extends SettingComponent {
                 open = false;
             }
             return true;
-        }
-
-        if (!open || b != 0) {
-            return false;
-        }
-
-        int contentY = y + height + 8;
-        for (int i = 0; i < CHANNEL_NAMES.length; i++) {
-            int rowY = contentY + i * 22;
-            if (mx >= x + 10 && mx <= x + width - 10 && my >= rowY && my <= rowY + 20) {
-                draggingChannel = i;
-                updateChannel(mx, i);
-                return true;
-            }
         }
 
         return false;
