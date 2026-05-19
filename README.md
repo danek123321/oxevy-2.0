@@ -23,10 +23,10 @@ Built with: ChatGPT • DeepSeek • OpenCode • Gemini • Cursor
 ### OyVey-Ported
 ![Original UI](images/ui.png)
 
-### OxeVy UI
-## Old One
+## OxeVy UI
+### Old One
 ![OxeVy UI](images/ui1.png)
-## New One
+### New One
 ![OxeVy UI2](images/ui2.png)
 
 ## Technologies Used
